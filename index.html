@@ -379,6 +379,10 @@ tr:hover td{background:#fbfbfb}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/><circle cx="17" cy="18" r="3"/><path d="M17 15v-2"/></svg>
       Modo Manga
     </button>
+    <button class="nav-item" onclick="navTo('clasificar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 3h10v9H3z"/><path d="M12 14h6"/></svg>
+      Armar rodeos
+    </button>
     <button class="nav-item" onclick="navTo('animales')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>
       Animales
@@ -499,9 +503,9 @@ tr:hover td{background:#fbfbfb}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 6h16M4 12h16M4 18h7"/><circle cx="17" cy="18" r="3"/></svg>
     <span style="font-weight:700">Manga</span>
   </button>
-  <button class="bnav-item" onclick="navTo('registrar')" id="bnav-registrar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-    Registrar
+  <button class="bnav-item" onclick="navTo('clasificar')" id="bnav-clasificar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 3h10v9H3z"/><path d="M12 14h6"/></svg>
+    Armar rodeos
   </button>
   <button class="bnav-item" onclick="navTo('rodeos')" id="bnav-rodeos">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -682,7 +686,7 @@ function navTo(p){
   document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
   const bnav=document.getElementById('bnav-'+p);
   if(bnav) bnav.classList.add('active');
-  const titulos={dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
+  const titulos={dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',clasificar:'Armar rodeos',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
   document.getElementById('page-title').textContent=titulos[p]||p;
   cerrarSidebar();
   if(p==='manga'){ abrirManga(); return; }
@@ -1047,9 +1051,175 @@ function eliminarAnimal(id){
   saveAll(); toast('Animal eliminado'); navTo('animales');
 }
 
+// ─── ARMAR RODEOS: escanear caravana → asignar al rodeo elegido ───
+let clasifCola=[]; let clasifUltimo=''; let clasifRodeoId=''; let clasifLog=[]; let clasifUndo=null; let clasifTimer=null; let clasifTecl=false; let clasifN=0;
+const COLORES_ROD=['#1a6649','#2980b9','#8b5e3c','#c0392b','#d35400','#27ae60','#7f8c8d'];
+
+render.clasificar = function(){
+  document.getElementById('topbar-actions').innerHTML='';
+  if(!rodeos.find(r=>r.id===clasifUltimo)) clasifUltimo='';
+  document.getElementById('content').innerHTML=`
+  <div class="card" style="max-width:640px;margin:0 auto">
+    <div class="card-body">
+      <div class="form-label" style="margin-bottom:6px">1 · Crear los rodeos</div>
+      <div style="display:flex;gap:8px">
+        <input id="cl-nuevo" class="form-input" placeholder="Ej: Sinacina, Nueva Vida, San Patricio" onkeydown="if(event.key==='Enter')clasifCrear()">
+        <button class="btn btn-primary" onclick="clasifCrear()">+ Crear</button>
+      </div>
+      <div id="cl-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 18px"></div>
+      <div class="form-label" style="margin-bottom:6px">2 · Escaneá la caravana y elegí el rodeo</div>
+      <div style="display:flex;gap:8px">
+        <input id="cl-scan" class="form-input" style="font-size:20px;font-family:monospace;padding:14px;text-align:center" placeholder="Escaneá acá..." autocomplete="off" autocorrect="off" spellcheck="false" inputmode="none" oninput="clasifInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();clasifProcesar();}">
+        <button class="btn btn-secondary" onclick="clasifTeclado()" title="Escribir a mano">⌨️</button>
+      </div>
+      <div id="cl-pend"></div>
+      <div id="cl-estado" style="margin-top:12px;padding:14px;border-radius:10px;background:var(--gris7);font-size:15px;text-align:center;min-height:54px;display:flex;align-items:center;justify-content:center">Listo para escanear</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+        <span id="cl-total" class="text-sm text-muted"></span>
+        <button class="btn btn-secondary btn-sm" onclick="clasifDeshacer()">↩ Deshacer último</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="max-width:640px;margin:14px auto 0">
+    <div class="card-header"><span class="card-title">Animales por rodeo</span></div>
+    <div class="card-body" id="cl-resumen" style="padding:8px 18px"></div>
+  </div>
+  <div class="card" style="max-width:640px;margin:14px auto 0">
+    <div class="card-header"><span class="card-title">Últimos escaneos</span></div>
+    <div class="card-body" id="cl-log" style="padding:8px 18px"></div>
+  </div>`;
+  clasifRefrescar(); clasifFoco();
+};
+
+function clasifFoco(){ setTimeout(()=>{ const i=document.getElementById('cl-scan'); if(i) i.focus(); },60); }
+
+function clasifTeclado(){
+  const i=document.getElementById('cl-scan'); if(!i) return;
+  clasifTecl=!clasifTecl;
+  i.setAttribute('inputmode',clasifTecl?'text':'none');
+  i.blur(); i.focus();
+  toast(clasifTecl?'Teclado activado: escribí y tocá Enter':'Modo bastón (sin teclado)');
+}
+
+function clasifMsg(tipo,txt){
+  const el=document.getElementById('cl-estado'); if(!el) return;
+  const m={ok:['#e8f5ef','#1a6649'],warn:['#fef5ec','#e67e22'],err:['#fdecea','#c0392b']}[tipo]||['#f5f5f5','#4a4a4a'];
+  el.style.background=m[0]; el.style.color=m[1]; el.style.fontWeight='600'; el.innerHTML=txt;
+}
+
+function clasifBeep(ok){
+  try{
+    if(navigator.vibrate) navigator.vibrate(ok?80:[60,60,60]);
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    const c=new AC(), o=c.createOscillator(), g=c.createGain();
+    o.connect(g); g.connect(c.destination); o.frequency.value=ok?880:300; g.gain.value=0.08;
+    o.start(); o.stop(c.currentTime+(ok?0.08:0.2)); setTimeout(()=>c.close(),500);
+  }catch(e){}
+}
+
+function clasifCrear(){
+  const inp=document.getElementById('cl-nuevo'); if(!inp) return;
+  const nom=inp.value.trim();
+  if(!nom){ toast('Escribí el nombre del rodeo','err'); return; }
+  if(rodeos.some(r=>r.nombre.toLowerCase()===nom.toLowerCase())){ toast('Ya existe ese rodeo','err'); return; }
+  const r={id:uid(),nombre:nom,estab:'',desc:'',color:COLORES_ROD[rodeos.length%COLORES_ROD.length],animales:[],sanidadBatch:[],creado:hoy()};
+  rodeos.push(r); clasifRodeoId=r.id; saveAll(); addActividad('🐄','Rodeo creado',nom);
+  inp.value='';
+  clasifRefrescar(); clasifMsg('ok','Rodeo «'+nom+'» creado'); clasifPend(); clasifFoco();
+}
+
+function clasifInput(){
+  clearTimeout(clasifTimer);
+  const i=document.getElementById('cl-scan'); if(!i) return;
+  // Con el bastón la lectura llega de golpe: procesar al quedar quieto el campo. A mano, solo con Enter.
+  if(!clasifTecl&&i.value.trim().length>=4) clasifTimer=setTimeout(clasifProcesar,400);
+}
+
+function esc(t){return String(t).replace(/[<>&"']/g,'');}
+
+function clasifProcesar(){
+  clearTimeout(clasifTimer);
+  const inp=document.getElementById('cl-scan'); if(!inp) return;
+  const v=esc(inp.value.trim()); if(!v) return;
+  inp.value='';
+  if(!rodeos.length){ clasifMsg('err','Primero creá los rodeos (paso 1)'); clasifBeep(false); return; }
+  if(clasifCola.some(x=>x.toUpperCase()===v.toUpperCase())){ clasifFoco(); return; }
+  clasifCola.push(v); clasifBeep(true);
+  clasifMsg('',clasifCola.length>1?'Lecturas esperando: '+clasifCola.length:'Elegí el rodeo para este animal');
+  clasifPend(); clasifFoco();
+}
+
+function clasifPend(){
+  const el=document.getElementById('cl-pend'); if(!el) return;
+  if(!clasifCola.length){ el.innerHTML=''; return; }
+  const v=clasifCola[0];
+  const a=animales.find(x=>x.car===v.toUpperCase()||x.ide===v);
+  const act=a?rodeos.find(r=>r.animales&&r.animales.includes(a.id)):null;
+  el.innerHTML=`<div style="margin-top:12px;padding:14px;border:2px solid #1a6649;border-radius:12px">
+    <div style="text-align:center;font-family:monospace;font-size:24px;font-weight:700">${v}</div>
+    <div style="text-align:center;font-size:13px;color:var(--gris5);margin:2px 0 12px">${a?(act?'Ahora está en '+act.nombre:'Ya registrado'):'Animal nuevo'}${clasifCola.length>1?' · +'+(clasifCola.length-1)+' esperando':''}</div>
+    <div style="display:grid;gap:8px">${rodeos.map(r=>{const u=r.id===clasifUltimo,c=r.color||'#1a6649';return `<button onclick="clasifAsignar('${r.id}')" style="padding:16px;font-size:18px;font-weight:700;border-radius:10px;border:2px solid ${c};background:${u?c:'#fff'};color:${u?'#fff':c}">${r.nombre}${u?' · el anterior':''}</button>`}).join('')}</div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="clasifDescartar()">Descartar esta lectura</button>
+  </div>`;
+}
+
+function clasifDescartar(){ clasifCola.shift(); clasifPend(); clasifMsg('warn','Lectura descartada'); clasifFoco(); }
+
+function clasifAsignar(rodId){
+  const v=clasifCola[0]; if(!v) return;
+  const rod=rodeos.find(r=>r.id===rodId); if(!rod) return;
+  clasifCola.shift(); clasifUltimo=rod.id; clasifRodeoId=rod.id;
+  const esEID=/^\d{10,15}$/.test(v), vUp=v.toUpperCase();
+  let a=animales.find(x=>x.car===vUp||x.ide===v), creado=false;
+  if(!a){
+    a={id:uid(),car:esEID?v:vUp,ide:esEID?v:null,cat:'sin categoría',fecha:hoy(),estab:rod.estab||'',sanidad:[],eventos:[],pesajes:[],reg:hoy(),ts:Date.now()};
+    animales.push(a); creado=true;
+  }
+  if(!rod.animales) rod.animales=[];
+  if(rod.animales.includes(a.id)){ clasifMsg('warn',`<b>${a.car}</b> ya estaba en ${rod.nombre}`); clasifBeep(false); clasifPend(); clasifRefrescar(); clasifFoco(); return; }
+  const prev=rodeos.find(r=>r.id!==rod.id&&r.animales&&r.animales.includes(a.id))||null;
+  if(prev) prev.animales=prev.animales.filter(x=>x!==a.id);
+  rod.animales.push(a.id);
+  if(!a.eventos) a.eventos=[];
+  const ev={id:uid(),tipo:'movimiento',desc:(prev?prev.nombre+' → ':'→ ')+rod.nombre,fecha:hoy()};
+  a.eventos.push(ev);
+  clasifUndo={aId:a.id,rodId:rod.id,prevId:prev?prev.id:null,creado,evId:ev.id};
+  clasifLog.unshift({car:a.car,rod:rod.nombre,prev:prev?prev.nombre:null,creado});
+  if(clasifLog.length>15) clasifLog.pop();
+  clasifN++;
+  saveAll();
+  clasifMsg('ok',`✓ <b>${a.car}</b> → ${rod.nombre}${prev?` <span style="font-weight:400">(venía de ${prev.nombre})</span>`:''}`);
+  clasifBeep(true); clasifPend(); clasifRefrescar(); clasifFoco();
+}
+
+function clasifDeshacer(){
+  const u=clasifUndo; if(!u){ toast('Nada para deshacer','err'); return; }
+  const rod=rodeos.find(r=>r.id===u.rodId);
+  if(rod&&rod.animales) rod.animales=rod.animales.filter(x=>x!==u.aId);
+  const a=animales.find(x=>x.id===u.aId);
+  const car=a?a.car:'';
+  if(u.creado){ animales=animales.filter(x=>x.id!==u.aId); }
+  else{
+    if(a) a.eventos=(a.eventos||[]).filter(e=>e.id!==u.evId);
+    if(u.prevId){ const p=rodeos.find(r=>r.id===u.prevId); if(p&&!p.animales.includes(u.aId)) p.animales.push(u.aId); }
+  }
+  clasifLog.shift(); clasifN=Math.max(0,clasifN-1); clasifUndo=null;
+  saveAll(); clasifMsg('warn','↩ Deshecho: '+car); clasifRefrescar(); clasifFoco();
+}
+
+function clasifRefrescar(){
+  const ch=document.getElementById('cl-chips');
+  if(ch) ch.innerHTML=rodeos.length===0?'<span style="color:var(--gris4);font-size:13px">Todavía no hay rodeos</span>':rodeos.map(r=>`<span style="padding:5px 10px;border-radius:14px;font-size:13px;font-weight:600;color:#fff;background:${r.color||'#1a6649'}">${r.nombre} · ${r.animales?r.animales.length:0}</span>`).join('');
+  const res=document.getElementById('cl-resumen');
+  if(res) res.innerHTML=rodeos.length===0?'<p style="color:var(--gris4);font-size:13px;padding:10px 0">Todavía no hay rodeos</p>':rodeos.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gris7)"><div style="width:14px;height:14px;border-radius:50%;background:${r.color||'#1a6649'};flex-shrink:0"></div><div style="flex:1;font-size:14px;font-weight:${r.id===clasifRodeoId?700:500}">${r.nombre}</div><div style="font-size:22px;font-weight:700">${r.animales?r.animales.length:0}</div></div>`).join('');
+  const lg=document.getElementById('cl-log');
+  if(lg) lg.innerHTML=clasifLog.length===0?'<p style="color:var(--gris4);font-size:13px;padding:10px 0">Todavía no escaneaste nada</p>':clasifLog.map(l=>`<div class="feed-item"><span class="feed-icon">🏷</span><div><strong style="font-family:monospace">${l.car}</strong> → ${l.rod}${l.prev?` <span style="color:var(--gris5)">(de ${l.prev})</span>`:''}${l.creado?' <span class="badge badge-azul">nuevo</span>':''}</div></div>`).join('');
+  const tot=document.getElementById('cl-total'); if(tot) tot.textContent=clasifN+' escaneados en esta sesión';
+}
+
 // ─── RODEOS ───
 render.rodeos = function(){
-  document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="abrirNuevoRodeo()">+ Nuevo rodeo</button>`;
+  document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-secondary" onclick="navTo('clasificar')">📷 Escanear y armar</button> <button class="btn btn-primary" onclick="abrirNuevoRodeo()">+ Nuevo rodeo</button>`;
   const rodeoCards = rodeos.length===0
     ? `<div class="empty-state"><div class="empty-icon">🐄</div><p>No hay rodeos creados todavía</p></div>`
     : rodeos.map(r=>{
