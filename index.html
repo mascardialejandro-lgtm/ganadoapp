@@ -598,7 +598,8 @@ const CATS = ['vaca','vaquillona','toro','torito','ternero','ternera','novillo',
 const RAZAS = ['Aberdeen Angus','Hereford','Shorthorn','Brahman','Brangus','Braford','Limousin','Charolais','Simmental','Otro'];
 const TIPO_SAN = ['vacuna','antibiótico','antiparasitario','vitamínico','antiinflamatorio','otro'];
 const TIPO_EV = ['parto','destete','servicio','castración','movimiento','categoría','ingreso','diagnóstico','otro'];
-const hoy = () => new Date().toISOString().split('T')[0];
+const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const hoy = () => isoLocal(new Date());
 
 function load(k){ try{ return JSON.parse(localStorage.getItem(k)||'null') }catch(e){ return null } }
 function save(k,v){ localStorage.setItem(k,JSON.stringify(v)) }
@@ -747,16 +748,7 @@ render.dashboard = function(){
   
   const c = document.getElementById('content');
   c.innerHTML=`
-  <div class="grid-4" style="margin-bottom:16px">
-    <div class="kpi"><div class="kpi-icon" style="background:#e8f5ef"><span style="font-size:22px">🐄</span></div><div><div class="kpi-num">${totalAn}</div><div class="kpi-label">Animales</div></div></div>
-    <div class="kpi"><div class="kpi-icon" style="background:#fdf3ec"><span style="font-size:22px">⚖️</span></div><div><div class="kpi-num">${conPeso}</div><div class="kpi-label">Con pesaje</div></div></div>
-    <div class="kpi"><div class="kpi-icon" style="background:#eaf4fb"><span style="font-size:22px">🤰</span></div><div><div class="kpi-num">${preniadas}</div><div class="kpi-label">Preñadas</div></div></div>
-    <div class="kpi"><div class="kpi-icon" style="background:${enCar>0?'#fdecea':'#e8f5ef'}"><span style="font-size:22px">🚫</span></div><div><div class="kpi-num" style="color:${enCar>0?'var(--rojo)':'var(--verde)'}">${enCar}</div><div class="kpi-label">En carencia</div></div></div>
-  </div>
-  <div class="card mb-14">
-    <div class="card-header"><span class="card-title">🐄 Rodeos y categorías</span></div>
-    <div class="card-body">${chartRodeosHTML()}</div>
-  </div>
+  ${tilesRodeosHTML(totalAn,preniadas,enCar,conPeso)}
   <div class="grid-2">
     <div>
       <div class="card mb-14">
@@ -1009,7 +1001,7 @@ function autoFillCarencia(id){
 function calcCarenciaFin(fecha,dias){
   if(!dias||dias<=0) return null;
   const d=new Date(fecha+'T00:00:00'); d.setDate(d.getDate()+parseInt(dias));
-  return d.toISOString().split('T')[0];
+  return isoLocal(d);
 }
 function guardarSanidad(animalId){
   const a=animales.find(x=>x.id===animalId); if(!a) return;
@@ -1080,6 +1072,24 @@ function eliminarAnimal(id){
 // ════════════════════════════════════════════════
 // DASHBOARD: rodeos por categoría
 // ════════════════════════════════════════════════
+function tilesRodeosHTML(total,prenadas,enCar,conPeso){
+  const grupos=rodeos.map(r=>({id:r.id,n:r.nombre,color:r.color||'#1a6649',an:(r.animales||[]).map(id=>animales.find(a=>a.id===id)).filter(Boolean)}));
+  const asig=new Set(rodeos.flatMap(r=>r.animales||[]));
+  const sin=animales.filter(a=>!asig.has(a.id));
+  if(sin.length) grupos.push({id:'',n:'Sin rodeo',color:'#9e9e9e',an:sin});
+  const resumen=`<div style="font-size:13px;color:var(--gris4);margin:0 2px 10px;display:flex;flex-wrap:wrap;gap:4px 14px"><span><b style="color:var(--gris1)">${total}</b> animales</span><span><b style="color:var(--gris1)">${prenadas}</b> preñadas</span><span style="${enCar?'color:var(--rojo)':''}"><b>${enCar}</b> en carencia</span><span><b style="color:var(--gris1)">${conPeso}</b> con pesaje</span></div>`;
+  if(!grupos.length) return resumen+'<div class="card mb-14"><div class="card-body" style="text-align:center;color:var(--gris4)">Todavía no hay rodeos. Creá uno en "Armar rodeos".</div></div>';
+  const tiles=grupos.map(g=>{
+    const cnt={}; g.an.forEach(a=>{cnt[a.cat]=(cnt[a.cat]||0)+1;});
+    const lineas=Object.keys(cnt).sort((x,y)=>(CATS.indexOf(x)<0?99:CATS.indexOf(x))-(CATS.indexOf(y)<0?99:CATS.indexOf(y))).map(c=>`<div style="display:flex;align-items:center;gap:6px;font-size:13px;padding:1px 0"><span style="width:9px;height:9px;border-radius:50%;background:${catColor(c)};flex-shrink:0"></span><b style="min-width:22px">${cnt[c]}</b><span style="color:var(--gris3)">${c}</span></div>`).join('');
+    return `<div class="kpi" ${g.id?`onclick="verRodeo('${g.id}')"`:''} style="display:block;border-left:5px solid ${g.color};cursor:${g.id?'pointer':'default'}">
+      <div style="font-size:13px;font-weight:700;color:var(--gris3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">${g.n}</div>
+      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px"><span class="kpi-num">${g.an.length}</span><span class="kpi-label">animales</span></div>
+      ${lineas||'<div style="font-size:12px;color:var(--gris4)">Vacío</div>'}
+    </div>`;
+  }).join('');
+  return resumen+`<div class="grid-4" style="margin-bottom:16px">${tiles}</div>`;
+}
 function chartRodeosHTML(){
   const grupos=rodeos.map(r=>({n:r.nombre,an:(r.animales||[]).map(id=>animales.find(a=>a.id===id)).filter(Boolean)}));
   const asig=new Set(rodeos.flatMap(r=>r.animales||[]));
@@ -1657,7 +1667,7 @@ function sanidadBatch(rId){
 render.gabinete = function(){
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="abrirNuevoMed()">+ Agregar producto</button>`;
   const hoyStr=hoy();
-  const en30=new Date(); en30.setDate(en30.getDate()+30); const en30Str=en30.toISOString().split('T')[0];
+  const en30=new Date(); en30.setDate(en30.getDate()+30); const en30Str=isoLocal(en30);
   
   const cards = meds.length===0
     ? `<div class="empty-state"><div class="empty-icon">💊</div><p>No hay productos en el gabinete</p></div>`
@@ -2259,16 +2269,16 @@ function borrarTodo(){
   if(!confirm('¿Borrar TODOS los animales, rodeos, medicamentos y actividad? No se puede deshacer.')) return;
   if(!confirm('Última confirmación: se borra todo. ¿Seguro?')) return;
   animales=[]; rodeos=[]; actividad=[]; meds=[];
-  try{ localStorage.setItem('ganadoapp_v2_nodemo','1'); }catch(e){}
+  try{ localStorage.setItem('ganadoapp_v2_nodemo','1'); localStorage.setItem('ganadoapp_v2_seed1','1'); }catch(e){}
   saveAll(); toast('Datos borrados'); navTo('dashboard');
 }
 function cargarDemoSiVacio(){
   try{ if(localStorage.getItem('ganadoapp_v2_nodemo')) return; }catch(e){}
   if(animales.length>0) return;
   const fechaAyer=new Date(); fechaAyer.setDate(fechaAyer.getDate()-1);
-  const f1=fechaAyer.toISOString().split('T')[0];
-  const finCarencia=new Date(); finCarencia.setDate(finCarencia.getDate()+15); const fc=finCarencia.toISOString().split('T')[0];
-  const partoProx=new Date(); partoProx.setDate(partoProx.getDate()+10); const fp=partoProx.toISOString().split('T')[0];
+  const f1=isoLocal(fechaAyer);
+  const finCarencia=new Date(); finCarencia.setDate(finCarencia.getDate()+15); const fc=isoLocal(finCarencia);
+  const partoProx=new Date(); partoProx.setDate(partoProx.getDate()+10); const fp=isoLocal(partoProx);
   
   animales=[
     {id:'d1',car:'AR-001001',ide:'900000000006296',cat:'vaca',raza:'Hereford',estab:'La Esperanza',color:'Colorado',edad:48,dientes:'BL',preg:'preñada',obs:'',foto:null,pesajes:[{kg:480,fecha:f1,ts:Date.now()-86400000},{kg:485,fecha:hoy(),ts:Date.now()}],sanidad:[{id:'s1',producto:'Ivermectina',tipo:'antiparasitario',dosis:'10ml',fecha:f1,carenciaDiasCarne:28,carenciaFinCarne:fc}],eventos:[{id:'e1',tipo:'diagnóstico',desc:'Preñez confirmada por eco',fecha:f1,fechaParto:fp}],reg:f1,ts:Date.now()},
@@ -2327,7 +2337,37 @@ function instalarApp(){
   deferredPrompt.userChoice.then(r=>{ if(r.outcome==='accepted') toast('Instalando...'); deferredPrompt=null; });
 }
 
+const SEED_HOY={clave:'ganadoapp_v2_seed1',fecha:'2026-11-24',rodeos:[{nombre:'Terneras Villa Iris',color:'#2980b9',a:[["1795547307612_esuk2","032010038393054"],["1795547324638_7nm3t","032010037209647"],["1795547464169_8mlny","032010038393051"],["1795547469261_61e5c","032010038393055"],["1795547500569_4rez2","032010037209645"]]},{nombre:'San Juan',color:'#1a6649',a:[["1795549370603_rng2s","032010025995156"],["1795549389461_bllwi","032010012890947"],["1795549397344_3za4z","032010012891020"],["1795549404522_0wvf2","032010029681309"],["1795549414624_5rb0w","032010029681501"],["1795549421163_55kgk","032010039806008"],["1795549430483_tl4gk","032010029681281"],["1795549656826_4xu6b","032010012891282"],["1795549689215_776ba","032010012891283"],["1795549762951_nyacd","032010012891284"],["1795549887135_cpcda","032010012891285"],["1795549891009_qyom4","032010012891000"],["1795549899032_iwrrn","032010029681315"],["1795549905511_rof27","032010012891286"],["1795549912118_9te1r","032010039806037"],["1795549918296_xscr4","032010029681279"],["1795549926237_eq0zc","032010025995372"],["1795549931662_htuwu","032010039806005"],["1795549961136_flsit","032010012891003"],["1795549969158_04skz","032010039805996"],["1795549975949_2sxm9","032010012890955"],["1795549985733_a4q9t","032010039322285"],["1795550224934_uvwel","032010012891287"],["1795550230129_g8ti5","032010012891288"],["1795550234089_v9j1h","032010039322293"],["1795550237733_hkuv5","032010039806025"],["1795550242927_gpgtr","032010039806046"],["1795550246138_3ty6d","032010039806047"],["1795550250018_i8wi2","032010039806006"],["1795550252813_07hj6","032010039806043"],["1795550255343_zih03","032010030030261"],["1795550258406_87w70","032010029681447"],["1795550262032_jw4hl","032010012891289"],["1795550387362_nly3n","032010039806040"],["1795550389725_itx8r","032010039806015"],["1795550392719_zlwwa","032010012891290"],["1795550395964_k7p3a","032010039805991"],["1795550399979_7stri","032010035144583"],["1795550404137_vbhyo","032010039806042"],["1795550409547_mtjzb","032010039806003"],["1795550635931_5zfrt","032010029681441"],["1795550641303_ze3ed","032010039806009"],["1795550647260_ndxql","032010008516753"],["1795550650455_iqy7w","032010039806049"],["1795550653305_cq96u","032010039806041"],["1795550656733_si0oz","032010039806030"],["1795550659645_d7grv","032010012891291"],["1795550662290_ui4f0","032010012891292"],["1795550664592_d65ff","032010029681438"],["1795550667499_jqguh","032010039806029"],["1795550671525_du38d","032010039805999"],["1795550822849_bvn70","032010039806048"],["1795550826425_t8pwc","032010039806013"],["1795550828774_e6hrc","032010012891293"],["1795550831336_ak2l8","032010039805984"],["1795550834612_bzhtc","032010039806017"],["1795550838709_propd","032010012891013"],["1795550841256_sgta8","032010039805977"],["1795550844249_qkkp8","032010039806044"],["1795550847580_f9c7j","032010039805981"],["1795550850973_ejrlc","032010012891294"],["1795550981780_f4ihe","032010012891295"],["1795550990486_f078h","032010039322291"],["1795550992650_2919c","032010039805990"],["1795550995579_8zgci","032010039806016"],["1795550999158_c7hmd","2010008516793"],["1795551004192_0yscj","032010039806000"],["1795551005866_0ixr0","0010039806019"],["1795551020559_q3v3d","032010039806004"],["1795551028850_9lyg3","032010008516794"],["1795551272120_pi1c3","032010039806032"],["1795551275447_32zqk","032010012891296"],["1795551278691_rogtv","032010039805998"],["1795551285003_kp51p","032010039805997"],["1795551290843_k1h22","032010039806036"],["1795551294256_fd7q5","032010012891297"],["1795551297152_004ko","032010039806002"],["1795551300516_lnm8l","032010012891298"],["1795551747553_bj5rv","032010029681425"],["1795551749032_5gcf4","032010030030259"],["1795551751884_s876f","032010029681442"],["1795551754560_w4aze","032010012891300"],["1795551758104_k5ga4","032010012891299"],["1795551761168_8lgdb","032010030030260"],["1795551763697_9p3j4","032010012891301"],["1795551766010_qqir2","032010012891302"],["1795551768089_ymkka","032010029681316"],["1795551771019_5u8jq","032010012891006"],["1795551773382_13zo3","032010029681437"],["1795551776664_b001f","032010012891303"],["1795551896162_pn6rx","032010029681310"],["1795551900108_s59ow","032010012891304"],["1795551904133_8jhr8","032010039805992"],["1795551913936_4pthr","032010039805995"],["1795551917665_dqrq0","032010012891305"],["1795551921095_iqmzn","032010012890958"],["1795552033542_vsv52","032010025995192"],["1795552037518_8vbjr","032010043675188"],["1795552040167_zyaya","032010010574502"],["1795552044510_epzin","032010043675180"]]}]};
+function aplicarSeedHoy(){
+  try{ if(localStorage.getItem(SEED_HOY.clave)) return; }catch(e){}
+  // renombrar rodeo mal escrito si ya existe (celular de la carga de campo)
+  rodeos.forEach(r=>{ if(r.nombre==='Terneras Villa Iria') r.nombre='Terneras Villa Iris'; });
+  const yaEstan=SEED_HOY.rodeos.some(sr=>sr.a.some(p=>animales.some(x=>x.ide===p[1]||x.car===p[1])));
+  if(!yaEstan){
+    // sacar los animales de ejemplo
+    const demo=['d1','d2','d3','d4','d5'];
+    animales=animales.filter(a=>!demo.includes(a.id));
+    rodeos.forEach(r=>{ if(r.animales) r.animales=r.animales.filter(x=>!demo.includes(x)); });
+    rodeos=rodeos.filter(r=>!(r.id==='r1'&&r.nombre==='Rodeo General'&&(!r.animales||!r.animales.length)));
+    SEED_HOY.rodeos.forEach(sr=>{
+      let rod=rodeos.find(r=>r.nombre.toLowerCase()===sr.nombre.toLowerCase());
+      if(!rod){ rod={id:uid(),nombre:sr.nombre,estab:'',desc:'',color:sr.color,animales:[],sanidadBatch:[],creado:SEED_HOY.fecha}; rodeos.push(rod); }
+      if(!rod.animales) rod.animales=[];
+      sr.a.forEach(p=>{
+        let a=animales.find(x=>x.ide===p[1]||x.car===p[1]);
+        if(!a){ a={id:p[0],car:p[1],ide:p[1],cat:'sin categoría',fecha:SEED_HOY.fecha,estab:'',sanidad:[],eventos:[{id:uid(),tipo:'movimiento',desc:'→ '+sr.nombre,fecha:SEED_HOY.fecha}],pesajes:[],reg:SEED_HOY.fecha,ts:Date.now()}; animales.push(a); }
+        rodeos.forEach(o=>{ if(o!==rod&&o.animales) o.animales=o.animales.filter(z=>z!==a.id); });
+        if(!rod.animales.includes(a.id)) rod.animales.push(a.id);
+      });
+    });
+    actividad=actividad.filter(x=>!(x.titulo==='Rodeo creado'&&x.det==='Rodeo General')&&!/^AR-00100\d$/.test(String(x.titulo||'').split(' ')[0]));
+    addActividad('📥','Carga inicial','105 animales: San Juan y Terneras Villa Iris');
+  }
+  try{ localStorage.setItem(SEED_HOY.clave,'1'); }catch(e){}
+  saveAll();
+}
 cargarDemoSiVacio();
+aplicarSeedHoy();
 navTo('dashboard');
 </script>
 </body>
