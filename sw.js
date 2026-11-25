@@ -3,8 +3,8 @@
 // Estrategia: Cache First para assets, Network First para datos
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME = 'ganadoapp-v10';
-const CACHE_VERSION = '10.0.0';
+const CACHE_NAME = 'ganadoapp-v11';
+const CACHE_VERSION = '11.0.0';
 
 // Archivos que se cachean en la instalación (app shell)
 const PRECACHE_URLS = [
@@ -13,6 +13,9 @@ const PRECACHE_URLS = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './firebase-app-compat.js',
+  './firebase-auth-compat.js',
+  './firebase-firestore-compat.js',
   // CDN externas — SheetJS
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];

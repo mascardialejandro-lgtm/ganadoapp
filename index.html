@@ -14,6 +14,9 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="firebase-app-compat.js"></script>
+<script src="firebase-auth-compat.js"></script>
+<script src="firebase-firestore-compat.js"></script>
 <style>
 :root {
   --verde: #1a6649;
@@ -414,6 +417,10 @@ tr:hover td{background:#fbfbfb}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 1-2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Exportar Excel
     </button>
+    <button class="nav-item" onclick="navTo('cuenta')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+      Cuenta y sincronización
+    </button>
     <button class="nav-item" onclick="exportarRespaldo()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Exportar respaldo (archivo)
@@ -438,6 +445,7 @@ tr:hover td{background:#fbfbfb}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <span class="page-title" id="page-title">Dashboard</span>
+      <span id="sync-chip" onclick="navTo('cuenta')" style="font-size:11px;font-weight:600;border:1px solid #7a7a7a;border-radius:12px;padding:2px 8px;cursor:pointer;white-space:nowrap;color:#7a7a7a">📱 Solo en este celular</span>
     </div>
     <div class="topbar-actions" id="topbar-actions">
       <button id="btn-instalar" onclick="instalarApp()" style="display:none;align-items:center;gap:6px;padding:6px 12px;background:#1a6649;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
@@ -529,6 +537,17 @@ tr:hover td{background:#fbfbfb}
     Rodeos
   </button>
 </nav>
+<div id="login-ov" style="display:none;position:fixed;inset:0;z-index:9999;background:#1a1a1a;color:#fff;align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:340px">
+    <div style="font-size:30px;font-weight:800;text-align:center;margin-bottom:4px">🐄 GanadoApp</div>
+    <div style="text-align:center;color:#9a9a9a;margin-bottom:22px;font-size:14px">Ingresá para ver los mismos datos en todos los celulares</div>
+    <input id="lg-email" type="email" autocomplete="username" placeholder="Email" style="width:100%;padding:14px;font-size:16px;border-radius:10px;border:1px solid #444;background:#2a2a2a;color:#fff;margin-bottom:10px;box-sizing:border-box">
+    <input id="lg-pass" type="password" autocomplete="current-password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')fbLogin()" style="width:100%;padding:14px;font-size:16px;border-radius:10px;border:1px solid #444;background:#2a2a2a;color:#fff;margin-bottom:10px;box-sizing:border-box">
+    <button onclick="fbLogin()" style="width:100%;padding:14px;font-size:16px;font-weight:700;border:none;border-radius:10px;background:#1a6649;color:#fff;cursor:pointer">Ingresar</button>
+    <div id="lg-msg" style="min-height:22px;margin-top:10px;font-size:14px;color:#f88;text-align:center"></div>
+    <div style="text-align:center;margin-top:8px"><a href="#" onclick="loginOmitir();return false" style="color:#9a9a9a;font-size:13px">Continuar sin sincronizar</a></div>
+  </div>
+</div>
 <div class="modal-bg" id="modal-animal">
   <div class="modal">
     <div class="modal-header">
@@ -609,7 +628,7 @@ let rodeos   = load(KEYS.rod) || [];
 let actividad= load(KEYS.act) || [];
 let meds     = load(KEYS.med) || [];
 
-function saveAll(){ save(KEYS.an,animales); save(KEYS.rod,rodeos); save(KEYS.act,actividad); save(KEYS.med,meds) }
+function saveAll(){ if(typeof syncMarcar==='function') syncMarcar(); save(KEYS.an,animales); save(KEYS.rod,rodeos); save(KEYS.act,actividad); save(KEYS.med,meds) }
 
 // ════════════════════════════════════════════════
 // UTILS
@@ -704,7 +723,7 @@ function navTo(p){
   document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
   const bnav=document.getElementById('bnav-'+p);
   if(bnav) bnav.classList.add('active');
-  const titulos={ingreso:'Ingreso de animales',dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',clasificar:'Armar rodeos',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
+  const titulos={cuenta:'Cuenta y sincronización',ingreso:'Ingreso de animales',dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',clasificar:'Armar rodeos',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
   document.getElementById('page-title').textContent=titulos[p]||p;
   cerrarSidebar();
   if(p==='manga'){ abrirManga(); return; }
@@ -2266,7 +2285,7 @@ function importarRespaldo(inp){
   rd.readAsText(f);
 }
 function borrarTodo(){
-  if(!confirm('¿Borrar TODOS los animales, rodeos, medicamentos y actividad? No se puede deshacer.')) return;
+  if(!confirm('¿Borrar TODOS los animales, rodeos, medicamentos y actividad?'+(SYNC.on?' ATENCIÓN: también se borran de la nube y del otro celular.':'')+' No se puede deshacer.')) return;
   if(!confirm('Última confirmación: se borra todo. ¿Seguro?')) return;
   animales=[]; rodeos=[]; actividad=[]; meds=[];
   try{ localStorage.setItem('ganadoapp_v2_nodemo','1'); localStorage.setItem('ganadoapp_v2_seed1','1'); }catch(e){}
@@ -2366,9 +2385,238 @@ function aplicarSeedHoy(){
   try{ localStorage.setItem(SEED_HOY.clave,'1'); }catch(e){}
   saveAll();
 }
+// ════════════════════════════════════════════════
+// SINCRONIZACIÓN (Firebase) — mismos datos en todos los celulares
+// ════════════════════════════════════════════════
+const FB_CFG={
+  apiKey:"AIzaSyC-xulPJUnllC7WpklPjZBklUhsVFvj_UI",
+  authDomain:"ganadoapp-91045.firebaseapp.com",
+  projectId:"ganadoapp-91045",
+  storageBucket:"ganadoapp-91045.firebasestorage.app",
+  messagingSenderId:"345819933456",
+  appId:"1:345819933456:web:6da0c28a8c908a73091395"
+};
+const SYNC={on:false,user:null,db:null,auth:null,persist:null,base:{animales:{},rodeos:{},meds:{}},visto:{animales:{},rodeos:{},meds:{}},
+  baseReady:false,actSig:'',actM:0,timer:null,ops:[],unsub:[],modoLocal:false,estado:'local',iniciando:false,ultimo:null};
+const SYNC_COLS=['animales','rodeos','meds'];
+const sigDe=o=>{const c=Object.assign({},o);delete c._m;return JSON.stringify(c);};
+const limpiar=o=>JSON.parse(JSON.stringify(o));
+function syncArr(col){ return col==='animales'?animales:col==='rodeos'?rodeos:meds; }
+function syncSet(col,arr){ if(col==='animales') animales=arr; else if(col==='rodeos') rodeos=arr; else meds=arr; }
+function syncGuardarLocal(){ try{ save(KEYS.an,animales); save(KEYS.rod,rodeos); save(KEYS.act,actividad); save(KEYS.med,meds); }catch(e){} }
+function syncGuardarVisto(){ try{ localStorage.setItem('ganadoapp_v2_cloudids',JSON.stringify(SYNC.visto)); }catch(e){} }
+
+function syncBaseInit(){
+  SYNC_COLS.forEach(c=>{ SYNC.base[c]={}; syncArr(c).forEach(o=>{ SYNC.base[c][o.id]=sigDe(o); }); });
+  SYNC.actSig=JSON.stringify(actividad);
+  try{ SYNC.actM=parseInt(localStorage.getItem('ganadoapp_v2_actm')||'0')||0; }catch(e){}
+  try{ const v=JSON.parse(localStorage.getItem('ganadoapp_v2_cloudids')||'null'); if(v) SYNC_COLS.forEach(c=>{ SYNC.visto[c]=v[c]||{}; }); }catch(e){}
+  SYNC.baseReady=true;
+}
+
+// Marca con fecha de modificación lo que cambió y encola el envío a la nube
+function syncMarcar(){
+  if(!SYNC.baseReady) return;
+  SYNC_COLS.forEach(col=>{
+    const base=SYNC.base[col], vistos={};
+    syncArr(col).forEach(o=>{
+      vistos[o.id]=1; const sg=sigDe(o);
+      if(base[o.id]!==sg){ o._m=Date.now(); base[o.id]=sg; if(SYNC.on) SYNC.ops.push({t:'set',col,id:o.id,data:limpiar(o)}); }
+    });
+    Object.keys(base).forEach(id=>{ if(!vistos[id]){ delete base[id]; if(SYNC.on) SYNC.ops.push({t:'del',col,id}); } });
+  });
+  const sa=JSON.stringify(actividad);
+  if(sa!==SYNC.actSig){ SYNC.actSig=sa; SYNC.actM=Date.now(); try{ localStorage.setItem('ganadoapp_v2_actm',String(SYNC.actM)); }catch(e){}
+    if(SYNC.on) SYNC.ops.push({t:'set',col:'meta',id:'actividad',data:{items:limpiar(actividad),_m:SYNC.actM}}); }
+  if(SYNC.ops.length) syncProgramar();
+}
+function syncProgramar(){ clearTimeout(SYNC.timer); SYNC.timer=setTimeout(syncVaciar,800); }
+function syncVaciar(){
+  if(!SYNC.db||!SYNC.on) return;
+  const m=new Map(); SYNC.ops.forEach(o=>m.set(o.col+'/'+o.id,o)); SYNC.ops=[];
+  const lista=[...m.values()]; if(!lista.length) return;
+  SYNC.estado='pend'; syncChip();
+  for(let i=0;i<lista.length;i+=400){
+    const b=SYNC.db.batch();
+    lista.slice(i,i+400).forEach(o=>{ const ref=SYNC.db.collection(o.col).doc(o.id); if(o.t==='set') b.set(ref,o.data); else b.delete(ref); });
+    b.commit().then(()=>{ SYNC.estado='ok'; SYNC.ultimo=new Date(); syncChip(); }).catch(e=>{ console.warn('sync',e); SYNC.estado='error'; syncChip(); });
+  }
+}
+
+function dedupRodeos(){
+  let cambio=false; const por={};
+  rodeos.forEach(r=>{ const k=String(r.nombre||'').trim().toLowerCase(); (por[k]=por[k]||[]).push(r); });
+  Object.keys(por).forEach(k=>{
+    const g=por[k]; if(g.length<2) return;
+    g.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    const keep=g[0]; if(!keep.animales) keep.animales=[];
+    g.slice(1).forEach(r=>{ (r.animales||[]).forEach(id=>{ if(!keep.animales.includes(id)) keep.animales.push(id); }); rodeos=rodeos.filter(x=>x!==r); });
+    cambio=true;
+  });
+  const dueno={};
+  rodeos.forEach(r=>(r.animales||[]).forEach(id=>{ const o=dueno[id]; if(!o||(r._m||0)>(o._m||0)||((r._m||0)===(o._m||0)&&String(r.id)<String(o.id))) dueno[id]=r; }));
+  rodeos.forEach(r=>{ const n=(r.animales||[]).filter(id=>dueno[id]===r); if(n.length!==(r.animales||[]).length){ r.animales=n; cambio=true; } });
+  if(cambio) saveAll();
+}
+
+async function syncIniciar(user){
+  if(SYNC.iniciando) return; SYNC.iniciando=true;
+  SYNC.user=user; SYNC.estado='conectando'; syncChip();
+  try{
+    await SYNC.persist;
+    const remoto={};
+    for(const col of SYNC_COLS){
+      const snap=await SYNC.db.collection(col).get({source:'server'});
+      remoto[col]={}; snap.forEach(d=>{ remoto[col][d.id]=d.data(); });
+    }
+    const act=await SYNC.db.collection('meta').doc('actividad').get({source:'server'});
+    // fusionar lo local con lo de la nube
+    SYNC_COLS.forEach(col=>{
+      const loc=syncArr(col), lmap={}, out=[]; loc.forEach(o=>{ lmap[o.id]=o; });
+      loc.forEach(l=>{
+        const r=remoto[col][l.id];
+        if(!r){ if(SYNC.visto[col][l.id]) return; out.push(l); }
+        else if((r._m||0)>=(l._m||0)) out.push(Object.assign({},r));
+        else out.push(l);
+      });
+      Object.keys(remoto[col]).forEach(id=>{ if(!lmap[id]&&!SYNC.visto[col][id]) out.push(Object.assign({},remoto[col][id])); });
+      syncSet(col,out);
+      SYNC.visto[col]={}; Object.keys(remoto[col]).forEach(id=>{ SYNC.visto[col][id]=1; });
+      SYNC.base[col]={}; Object.keys(remoto[col]).forEach(id=>{ SYNC.base[col][id]=sigDe(remoto[col][id]); });
+    });
+    if(act.exists){ const d=act.data(); if((d._m||0)>SYNC.actM){ actividad=d.items||[]; SYNC.actM=d._m||0; try{localStorage.setItem('ganadoapp_v2_actm',String(SYNC.actM));}catch(e){} } }
+    SYNC.actSig=act.exists&&(act.data()._m||0)>=SYNC.actM?JSON.stringify(actividad):'';
+    SYNC.on=true;
+    syncGuardarVisto();
+    dedupRodeos();
+    saveAll();            // sube lo local más nuevo, lo nuevo y los borrados
+    syncVaciar();
+    syncEscuchar();
+    syncGuardarLocal();
+    SYNC.estado='ok'; SYNC.ultimo=new Date(); syncChip(); syncRefrescarUI();
+  }catch(e){
+    console.warn('sync init',e); SYNC.on=false;
+    SYNC.estado=(e&&e.code==='permission-denied')?'permiso':'offline'; syncChip();
+    if(!(e&&e.code==='permission-denied')) setTimeout(()=>{ if(!SYNC.on&&SYNC.user) syncIniciar(SYNC.user); },20000);
+  }finally{ SYNC.iniciando=false; }
+}
+
+function syncEscuchar(){
+  SYNC.unsub.forEach(f=>{ try{f();}catch(e){} }); SYNC.unsub=[];
+  SYNC_COLS.forEach(col=>{
+    const un=SYNC.db.collection(col).onSnapshot({includeMetadataChanges:true},snap=>{
+      let cambio=false;
+      snap.docChanges({includeMetadataChanges:true}).forEach(ch=>{
+        const id=ch.doc.id, pend=ch.doc.metadata.hasPendingWrites;
+        if(ch.type==='removed'){
+          delete SYNC.visto[col][id];
+          if(pend) return;
+          const arr=syncArr(col);
+          if(arr.some(o=>o.id===id)){ syncSet(col,arr.filter(o=>o.id!==id)); delete SYNC.base[col][id]; cambio=true; }
+          return;
+        }
+        if(pend) return;
+        SYNC.visto[col][id]=1;
+        const d=ch.doc.data(), arr=syncArr(col), i=arr.findIndex(o=>o.id===id);
+        if(i>=0){
+          if(sigDe(arr[i])===sigDe(d)){ SYNC.base[col][id]=sigDe(d); if(arr[i]._m!==d._m) arr[i]._m=d._m; return; }
+          if((arr[i]._m||0)>(d._m||0)) return;
+          arr[i]=Object.assign({},d);
+        }else arr.push(Object.assign({},d));
+        SYNC.base[col][id]=sigDe(d); cambio=true;
+      });
+      syncGuardarVisto();
+      if(cambio){ dedupRodeos(); syncGuardarLocal(); syncRefrescarUI(); }
+    },err=>{ console.warn('listen',err); });
+    SYNC.unsub.push(un);
+  });
+  const ua=SYNC.db.collection('meta').doc('actividad').onSnapshot(s=>{
+    if(!s.exists||s.metadata.hasPendingWrites) return;
+    const d=s.data(); if((d._m||0)>SYNC.actM){ actividad=d.items||[]; SYNC.actM=d._m||0; SYNC.actSig=JSON.stringify(actividad); try{localStorage.setItem('ganadoapp_v2_actm',String(SYNC.actM));}catch(e){} syncGuardarLocal(); syncRefrescarUI(); }
+  },()=>{});
+  SYNC.unsub.push(ua);
+}
+
+function syncRefrescarUI(){
+  try{
+    if(document.querySelector('.modal-bg.open')) return;
+    const p=paginaActual;
+    if(p==='clasificar'){ clasifRefrescar(); clasifPend(); }
+    else if(['dashboard','animales','rodeos','gabinete','resumen','cuenta'].includes(p)&&render[p]) render[p]();
+  }catch(e){}
+}
+
+function syncChip(){
+  const el=document.getElementById('sync-chip'); if(!el) return;
+  let t='📱 Solo en este celular', c='#7a7a7a';
+  if(SYNC.modoLocal||!SYNC.db){ /* local */ }
+  else if(!SYNC.user){ t='🔒 Sin iniciar sesión'; c='#e67e22'; }
+  else if(SYNC.estado==='permiso'){ t='⛔ Sin permiso'; c='#c0392b'; }
+  else if(!navigator.onLine||SYNC.estado==='offline'){ t='📴 Sin señal: se sube al volver'; c='#e67e22'; }
+  else if(SYNC.estado==='conectando'){ t='⏳ Conectando…'; c='#7a7a7a'; }
+  else if(SYNC.estado==='pend'){ t='⏳ Subiendo…'; c='#e67e22'; }
+  else if(SYNC.estado==='error'){ t='⚠️ Error al sincronizar'; c='#c0392b'; }
+  else if(SYNC.on){ t='☁️ Sincronizado'; c='#1a6649'; }
+  el.textContent=t; el.style.color=c; el.style.borderColor=c;
+  if(paginaActual==='cuenta'&&render.cuenta) { try{ render.cuenta(); }catch(e){} }
+}
+window.addEventListener('online',()=>{ syncChip(); if(SYNC.user&&!SYNC.on) syncIniciar(SYNC.user); });
+window.addEventListener('offline',syncChip);
+
+// ─── Pantalla de ingreso (login) ───
+function mostrarLogin(){ const o=document.getElementById('login-ov'); if(o&&!SYNC.modoLocal) o.style.display='flex'; }
+function ocultarLogin(){ const o=document.getElementById('login-ov'); if(o) o.style.display='none'; }
+function fbLogin(){
+  const e=document.getElementById('lg-email').value.trim(), p=document.getElementById('lg-pass').value;
+  const m=document.getElementById('lg-msg'); m.textContent='';
+  if(!e||!p){ m.textContent='Completá email y contraseña'; return; }
+  if(!SYNC.auth){ m.textContent='No se pudo cargar el sistema de ingreso. Abrí la app con internet.'; return; }
+  m.style.color='#9ad'; m.textContent='Ingresando…';
+  SYNC.auth.signInWithEmailAndPassword(e,p).then(()=>{ m.textContent=''; }).catch(err=>{
+    const mapa={'auth/invalid-credential':'Email o contraseña incorrectos','auth/wrong-password':'Contraseña incorrecta','auth/user-not-found':'No existe ese usuario','auth/invalid-email':'Email no válido','auth/network-request-failed':'Sin conexión: necesitás internet para iniciar sesión','auth/too-many-requests':'Demasiados intentos. Esperá unos minutos'};
+    m.style.color='#f88'; m.textContent=mapa[err.code]||('Error: '+(err.code||err.message));
+  });
+}
+function loginOmitir(){ SYNC.modoLocal=true; ocultarLogin(); syncChip(); toast('Modo local: no se sincroniza','err'); }
+function fbLogout(){
+  if(!confirm('¿Cerrar sesión? Los datos de este celular se conservan.')) return;
+  SYNC.on=false; SYNC.unsub.forEach(f=>{ try{f();}catch(e){} }); SYNC.unsub=[]; SYNC.user=null;
+  SYNC.auth&&SYNC.auth.signOut(); syncChip();
+}
+function syncAhora(){ if(!SYNC.user){ mostrarLogin(); return; } SYNC.on=false; syncIniciar(SYNC.user); toast('Sincronizando…'); }
+
+render.cuenta = function(){
+  document.getElementById('topbar-actions').innerHTML='';
+  const chip=document.getElementById('sync-chip'); const est=chip?chip.textContent:'';
+  document.getElementById('content').innerHTML=`<div class="card" style="max-width:560px;margin:0 auto"><div class="card-header"><span class="card-title">Cuenta y sincronización</span></div><div class="card-body">
+    <div class="text-sm text-muted">Usuario</div><div style="font-weight:700;margin-bottom:12px">${SYNC.user?SYNC.user.email:'— sin iniciar sesión —'}</div>
+    <div class="text-sm text-muted">Estado</div><div style="font-weight:700;margin-bottom:4px">${est}</div>
+    <div class="text-sm text-muted" style="margin-bottom:14px">${SYNC.ultimo?'Última sincronización: '+SYNC.ultimo.toLocaleTimeString('es-AR'):''}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${SYNC.user?`<button class="btn btn-primary" onclick="syncAhora()">🔄 Sincronizar ahora</button><button class="btn btn-secondary" onclick="fbLogout()">Cerrar sesión</button>`:`<button class="btn btn-primary" onclick="SYNC.modoLocal=false;mostrarLogin()">Iniciar sesión</button>`}</div>
+    <p class="text-sm text-muted" style="margin-top:14px">Sin señal podés seguir trabajando: los cambios se guardan en el celular y se suben solos cuando vuelve internet.</p>
+  </div></div>`;
+};
+
+function iniciarFirebase(){
+  syncBaseInit();
+  if(typeof firebase==='undefined'){ syncChip(); return; }
+  try{
+    firebase.initializeApp(FB_CFG);
+    SYNC.auth=firebase.auth(); SYNC.db=firebase.firestore();
+    try{ SYNC.db.settings({ignoreUndefinedProperties:true,merge:true}); }catch(e){}
+    SYNC.persist=SYNC.db.enablePersistence({synchronizeTabs:true}).catch(e=>{ console.warn('persistencia',e&&e.code); });
+    SYNC.auth.onAuthStateChanged(u=>{
+      if(u){ ocultarLogin(); syncIniciar(u); }
+      else{ SYNC.on=false; SYNC.user=null; mostrarLogin(); syncChip(); }
+    });
+  }catch(e){ console.warn('firebase',e); }
+  syncChip();
+}
+
 cargarDemoSiVacio();
 aplicarSeedHoy();
 navTo('dashboard');
+iniciarFirebase();
 </script>
 </body>
 </html>
