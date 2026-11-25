@@ -3,8 +3,8 @@
 // Estrategia: Cache First para assets, Network First para datos
 // ═══════════════════════════════════════════════════
 
-const CACHE_NAME = 'ganadoapp-v11';
-const CACHE_VERSION = '11.0.0';
+const CACHE_NAME = 'ganadoapp-v12';
+const CACHE_VERSION = '12.0.0';
 
 // Archivos que se cachean en la instalación (app shell)
 const PRECACHE_URLS = [

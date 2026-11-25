@@ -1160,10 +1160,23 @@ function cambiarRodeoAnimal(id){
   addActividad('🔀',a.car,(prev?prev.nombre:'Sin rodeo')+' → '+(dest?dest.nombre:'Sin rodeo'));
   saveAll(); toast('Rodeo actualizado'); reabrirAnimal(id);
 }
+function cambiarIDV(id){
+  const a=animales.find(x=>x.id===id); if(!a) return;
+  const v=esc(document.getElementById('idv-'+id).value.trim()).toUpperCase();
+  if(!v){ toast('Escribí la caravana visual','err'); return; }
+  if(animales.some(x=>x.id!==id&&x.car===v)){ toast('Ya hay otro animal con esa caravana','err'); return; }
+  if(!a.eventos) a.eventos=[];
+  a.eventos.push({id:uid(),tipo:'otro',desc:'Caravana visual: '+a.car+' → '+v,fecha:hoy()});
+  if(!a.ide&&/^\d{10,15}$/.test(a.car)) a.ide=a.car;
+  a.car=v; saveAll(); toast('Caravana visual actualizada'); reabrirAnimal(id);
+}
 function bloqueCambiosHTML(a){
   const rod=rodeoDe(a);
   const cats=[...CATS]; if(a.cat&&!cats.includes(a.cat)) cats.push(a.cat);
+  const sinIDV=a.ide&&a.car===a.ide;
   return `<div style="border-top:1px solid var(--gris7);margin-top:14px;padding-top:12px">
+    <div class="fw-600 text-sm mb-8">Caravana visual (IDV) ${sinIDV?'<span class="badge badge-azul">sin cargar</span>':''}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input id="idv-${a.id}" class="form-input" value="${sinIDV?'':a.car}" placeholder="AR-000000" autocomplete="off"><button class="btn btn-primary btn-sm" onclick="cambiarIDV('${a.id}')">Guardar</button></div>
     <div class="fw-600 text-sm mb-8">Cambiar categoría <span class="text-muted" style="font-weight:400">(ahora: ${a.cat})</span></div>
     <div style="display:flex;gap:8px;margin-bottom:12px"><select id="cc-cat-${a.id}" class="form-select">${cats.map(c=>`<option ${c===a.cat?'selected':''}>${c}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="cambiarCategoria('${a.id}')">Guardar</button></div>
     <div class="fw-600 text-sm mb-8">Cambiar de rodeo <span class="text-muted" style="font-weight:400">(ahora: ${rod?rod.nombre:'sin rodeo'})</span></div>
@@ -1278,6 +1291,15 @@ render.ingreso = function(){
       <div id="ing-prev" style="margin-top:10px"></div>
     </div>
   </div>
+  <div class="card" style="max-width:700px;margin:0 auto 14px">
+    <div class="card-header"><span class="card-title">3 · Actualizar animales ya cargados (por archivo)</span></div>
+    <div class="card-body">
+      <p class="text-sm text-muted" style="margin-bottom:10px">Sirve para completar la <b>caravana visual (IDV)</b>, la <b>categoría</b>, la raza o el peso de animales que ya están. Excel o CSV con columnas <b>IDE</b> (número del chip) y las que quieras actualizar: <b>IDV</b>, Categoría, Raza, Peso.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="updPlantilla()">⬇ Descargar plantilla</button><button class="btn btn-secondary btn-sm" onclick="document.getElementById('upd-file').click()">📂 Elegir archivo</button></div>
+      <input type="file" id="upd-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="updArchivo(this)">
+      <div id="upd-prev" style="margin-top:10px"></div>
+    </div>
+  </div>
   <div id="ing-res" style="max-width:700px;margin:0 auto"></div>`;
   ingRefrescar(); setTimeout(()=>{const i=document.getElementById('ing-scan'); if(i) i.focus();},80);
 };
@@ -1367,6 +1389,52 @@ function ingImportarArchivo(){
   const r=ingCrear(ingFilas,ingDatos()); ingFilas=[];
   document.getElementById('ing-prev').innerHTML=''; ingMostrarRes(r); toast('Importación lista');
 }
+let updFilas=[];
+function updPlantilla(){
+  if(typeof XLSX==='undefined'){ toast('Abrí la app con internet una vez','err'); return; }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['IDE','IDV','Categoría','Raza','Peso'],['032010038393054','AR-001234','ternera','Aberdeen Angus',180]]),'Actualizar');
+  XLSX.writeFile(wb,'plantilla_actualizar_GanadoApp.xlsx');
+}
+function updArchivo(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(typeof XLSX==='undefined'){ toast('Falta la librería de Excel: abrí la app con internet una vez','err'); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(rd.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+      updFilas=rows.map(r=>{ const o={}; Object.keys(r).forEach(k=>{ const nk=ingNorm(k); for(const f2 in ING_MAP) if(ING_MAP[f2].includes(nk)) o[f2]=String(r[k]).trim(); }); return o; }).filter(o=>o.car||o.ide);
+      const pv=document.getElementById('upd-prev');
+      pv.innerHTML=updFilas.length?`<div style="padding:10px;background:var(--gris7);border-radius:8px;font-size:14px">Archivo <b>${f.name}</b>: ${updFilas.length} filas.</div><button class="btn btn-primary" style="width:100%;margin-top:10px;padding:12px" onclick="updAplicar()">Actualizar ${updFilas.length} animales</button>`:'<div style="color:var(--rojo);font-size:13px">No encontré filas con IDE o IDV.</div>';
+    }catch(e){ toast('No pude leer el archivo','err'); }
+    inp.value='';
+  };
+  rd.readAsArrayBuffer(f);
+}
+function updAplicar(){
+  let ok=0; const noEnc=[], dup=[];
+  updFilas.forEach(o=>{
+    const ide=String(o.ide||'').replace(/\D/g,''), idv=String(o.car||'').toUpperCase();
+    let a=(ide&&animales.find(x=>x.ide===ide||x.car===ide))||(idv&&animales.find(x=>x.car===idv))||null;
+    if(!a){ noEnc.push(ide||idv); return; }
+    if(!a.eventos) a.eventos=[];
+    let cambio=false;
+    if(idv&&idv!==a.car&&!(ide&&idv===ide)){
+      if(animales.some(x=>x.id!==a.id&&x.car===idv)){ dup.push(idv); }
+      else{ a.eventos.push({id:uid(),tipo:'otro',desc:'Caravana visual: '+a.car+' → '+idv,fecha:hoy()}); if(!a.ide&&/^\d{10,15}$/.test(a.car)) a.ide=a.car; if(!a.ide&&ide) a.ide=ide; a.car=idv; cambio=true; }
+    }
+    const c=String(o.cat||'').toLowerCase().trim();
+    if(CATS.includes(c)&&c!==a.cat){ a.eventos.push({id:uid(),tipo:'categoría',desc:a.cat+' → '+c,fecha:hoy()}); a.cat=c; cambio=true; }
+    if(o.raza&&o.raza!==a.raza){ a.raza=o.raza; cambio=true; }
+    const kg=parseFloat(o.peso); if(kg){ (a.pesajes=a.pesajes||[]).push({kg,fecha:hoy(),ts:Date.now()}); cambio=true; }
+    if(cambio) ok++;
+  });
+  saveAll(); updFilas=[]; document.getElementById('upd-prev').innerHTML='';
+  const el=document.getElementById('ing-res');
+  el.innerHTML=`<div class="card"><div class="card-body" style="background:#e8f5ef;color:#1a6649;font-weight:600">✓ ${ok} animales actualizados${noEnc.length?`<div style="font-weight:400;color:#e67e22;margin-top:6px">${noEnc.length} no encontrados: ${noEnc.slice(0,10).join(', ')}${noEnc.length>10?'…':''}</div>`:''}${dup.length?`<div style="font-weight:400;color:#e67e22;margin-top:6px">${dup.length} IDV repetidos (no se cambiaron): ${dup.slice(0,10).join(', ')}</div>`:''}</div></div>`;
+  addActividad('📝','Actualización por archivo',ok+' animales'); toast('Actualización lista');
+}
 function ingPlantilla(){
   if(typeof XLSX==='undefined'){ toast('Abrí la app con internet una vez','err'); return; }
   const wb=XLSX.utils.book_new();
@@ -1395,6 +1463,7 @@ render.clasificar = function(){
         <input id="cl-scan" class="form-input" style="font-size:20px;font-family:monospace;padding:14px;text-align:center" placeholder="Escaneá acá..." autocomplete="off" autocorrect="off" spellcheck="false" inputmode="none" oninput="clasifInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();clasifProcesar();}">
         <button class="btn btn-secondary" onclick="clasifTeclado()" title="Escribir a mano">⌨️</button>
       </div>
+      <div style="margin-top:10px"><label class="form-label">Categoría de lo que escaneás (opcional)</label><select id="cl-cat" class="form-select"><option value="">— No cambiar —</option>${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
       <div id="cl-pend"></div>
       <div id="cl-estado" style="margin-top:12px;padding:14px;border-radius:10px;background:var(--gris7);font-size:15px;text-align:center;min-height:54px;display:flex;align-items:center;justify-content:center">Listo para escanear</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
@@ -1498,20 +1567,28 @@ function clasifAsignar(rodId){
     a={id:uid(),car:esEID?v:vUp,ide:esEID?v:null,cat:'sin categoría',fecha:hoy(),estab:rod.estab||'',sanidad:[],eventos:[],pesajes:[],reg:hoy(),ts:Date.now()};
     animales.push(a); creado=true;
   }
+  if(!a.eventos) a.eventos=[];
+  // categoría opcional
+  const catSel=((document.getElementById('cl-cat')||{}).value)||'';
+  let prevCat=null, catEvId=null;
+  if(catSel&&a.cat!==catSel){ prevCat=a.cat; catEvId=uid(); a.eventos.push({id:catEvId,tipo:'categoría',desc:a.cat+' → '+catSel,fecha:hoy()}); a.cat=catSel; }
   if(!rod.animales) rod.animales=[];
-  if(rod.animales.includes(a.id)){ clasifMsg('warn',`<b>${a.car}</b> ya estaba en ${rod.nombre}`); clasifBeep(false); clasifPend(); clasifRefrescar(); clasifFoco(); return; }
+  if(rod.animales.includes(a.id)){
+    if(prevCat!==null){ saveAll(); clasifMsg('ok',`✓ <b>${a.car}</b> ya estaba en ${rod.nombre} · categoría: ${a.cat}`); clasifBeep(true); }
+    else{ clasifMsg('warn',`<b>${a.car}</b> ya estaba en ${rod.nombre}`); clasifBeep(false); }
+    clasifPend(); clasifRefrescar(); clasifFoco(); return;
+  }
   const prev=rodeos.find(r=>r.id!==rod.id&&r.animales&&r.animales.includes(a.id))||null;
   if(prev) prev.animales=prev.animales.filter(x=>x!==a.id);
   rod.animales.push(a.id);
-  if(!a.eventos) a.eventos=[];
   const ev={id:uid(),tipo:'movimiento',desc:(prev?prev.nombre+' → ':'→ ')+rod.nombre,fecha:hoy()};
   a.eventos.push(ev);
-  clasifUndo={aId:a.id,rodId:rod.id,prevId:prev?prev.id:null,creado,evId:ev.id};
+  clasifUndo={aId:a.id,rodId:rod.id,prevId:prev?prev.id:null,creado,evId:ev.id,prevCat,catEvId};
   clasifLog.unshift({car:a.car,rod:rod.nombre,prev:prev?prev.nombre:null,creado});
   if(clasifLog.length>15) clasifLog.pop();
   clasifN++;
   saveAll();
-  clasifMsg('ok',`✓ <b>${a.car}</b> → ${rod.nombre}${prev?` <span style="font-weight:400">(venía de ${prev.nombre})</span>`:''}`);
+  clasifMsg('ok',`✓ <b>${a.car}</b> → ${rod.nombre}${prevCat!==null?' · '+a.cat:''}${prev?` <span style="font-weight:400">(venía de ${prev.nombre})</span>`:''}`);
   clasifBeep(true); clasifPend(); clasifRefrescar(); clasifFoco();
 }
 
@@ -1523,7 +1600,8 @@ function clasifDeshacer(){
   const car=a?a.car:'';
   if(u.creado){ animales=animales.filter(x=>x.id!==u.aId); }
   else{
-    if(a) a.eventos=(a.eventos||[]).filter(e=>e.id!==u.evId);
+    if(a) a.eventos=(a.eventos||[]).filter(e=>e.id!==u.evId&&e.id!==u.catEvId);
+    if(a&&u.prevCat!=null) a.cat=u.prevCat;
     if(u.prevId){ const p=rodeos.find(r=>r.id===u.prevId); if(p&&!p.animales.includes(u.aId)) p.animales.push(u.aId); }
   }
   clasifLog.shift(); clasifN=Math.max(0,clasifN-1); clasifUndo=null;
@@ -1602,6 +1680,7 @@ function verRodeo(id){
     <button class="tab-btn" onclick="swTabModal(this,'rt-scan')">Escanear</button>
   </div>
   <div id="rt-animales" class="tab-panel active"><div class="table-wrap"><table><thead><tr><th>Caravana</th><th>Categoría</th><th>Peso</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
+    <div style="margin-top:12px;padding:10px 12px;background:var(--gris7);border-radius:8px"><div class="fw-600 text-sm mb-8">Cambiar categoría de todo el rodeo (${lista.length})</div><div style="display:flex;gap:8px"><select id="rod-cat-todos" class="form-select">${CATS.map(c=>`<option>${c}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="rodCatTodos('${r.id}')">Aplicar</button></div></div>
     <div style="margin-top:12px"><div class="fw-600 text-sm mb-8">Agregar de lista existente</div><select id="rod-add-sel" class="form-select" style="max-width:260px"><option value="">Seleccionar animal...</option>${animales.map(a=>`<option value="${a.id}">${a.car} — ${a.cat}</option>`).join('')}</select> <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="addAlRodeo('${r.id}')">+ Agregar</button></div>
   </div>
   <div id="rt-sanidad" class="tab-panel">
@@ -1623,6 +1702,15 @@ function verRodeo(id){
     <div id="rod-scan-log" style="margin-top:10px"></div>
   </div>`;
   abrirModal('modal-rodeo');
+}
+function rodCatTodos(rId){
+  const r=rodeos.find(x=>x.id===rId); if(!r) return;
+  const cat=document.getElementById('rod-cat-todos').value;
+  const lista=(r.animales||[]).map(id=>animales.find(a=>a.id===id)).filter(Boolean);
+  if(!lista.length){ toast('El rodeo está vacío','err'); return; }
+  if(!confirm('¿Pasar los '+lista.length+' animales de "'+r.nombre+'" a categoría "'+cat+'"?')) return;
+  let n=0; lista.forEach(a=>{ if(a.cat!==cat){ (a.eventos=a.eventos||[]).push({id:uid(),tipo:'categoría',desc:a.cat+' → '+cat,fecha:hoy()}); a.cat=cat; n++; } });
+  saveAll(); addActividad('🏷',r.nombre,n+' animales → '+cat); toast(n+' animales actualizados'); verRodeo(rId);
 }
 function swTabModal(btn,id){
   const cont=btn.closest('.modal-body');
