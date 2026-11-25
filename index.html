@@ -383,6 +383,10 @@ tr:hover td{background:#fbfbfb}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 3h10v9H3z"/><path d="M12 14h6"/></svg>
       Armar rodeos
     </button>
+    <button class="nav-item" onclick="navTo('ingreso')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Ingreso de animales
+    </button>
     <button class="nav-item" onclick="navTo('animales')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>
       Animales
@@ -410,6 +414,15 @@ tr:hover td{background:#fbfbfb}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 1-2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       Exportar Excel
     </button>
+    <button class="nav-item" onclick="exportarRespaldo()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Exportar respaldo (archivo)
+    </button>
+    <button class="nav-item" onclick="document.getElementById('imp-resp').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Importar respaldo
+    </button>
+    <input type="file" id="imp-resp" accept=".json,application/json" style="display:none" onchange="importarRespaldo(this)">
     <button class="nav-item" onclick="borrarTodo()" style="color:#e57373">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
       Borrar todos los datos
@@ -584,7 +597,7 @@ const KEYS = { an:'ganadoapp_v2', rod:'ganadoapp_v2_rod', act:'ganadoapp_v2_act'
 const CATS = ['vaca','vaquillona','toro','torito','ternero','ternera','novillo','novillito'];
 const RAZAS = ['Aberdeen Angus','Hereford','Shorthorn','Brahman','Brangus','Braford','Limousin','Charolais','Simmental','Otro'];
 const TIPO_SAN = ['vacuna','antibiótico','antiparasitario','vitamínico','antiinflamatorio','otro'];
-const TIPO_EV = ['parto','destete','servicio','castración','movimiento','diagnóstico','otro'];
+const TIPO_EV = ['parto','destete','servicio','castración','movimiento','categoría','ingreso','diagnóstico','otro'];
 const hoy = () => new Date().toISOString().split('T')[0];
 
 function load(k){ try{ return JSON.parse(localStorage.getItem(k)||'null') }catch(e){ return null } }
@@ -690,7 +703,7 @@ function navTo(p){
   document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
   const bnav=document.getElementById('bnav-'+p);
   if(bnav) bnav.classList.add('active');
-  const titulos={dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',clasificar:'Armar rodeos',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
+  const titulos={ingreso:'Ingreso de animales',dashboard:'Dashboard',manga:'Modo Manga',animales:'Animales',registrar:'Registrar animal',clasificar:'Armar rodeos',rodeos:'Rodeos',gabinete:'Gabinete',resumen:'Resumen'};
   document.getElementById('page-title').textContent=titulos[p]||p;
   cerrarSidebar();
   if(p==='manga'){ abrirManga(); return; }
@@ -739,6 +752,10 @@ render.dashboard = function(){
     <div class="kpi"><div class="kpi-icon" style="background:#fdf3ec"><span style="font-size:22px">⚖️</span></div><div><div class="kpi-num">${conPeso}</div><div class="kpi-label">Con pesaje</div></div></div>
     <div class="kpi"><div class="kpi-icon" style="background:#eaf4fb"><span style="font-size:22px">🤰</span></div><div><div class="kpi-num">${preniadas}</div><div class="kpi-label">Preñadas</div></div></div>
     <div class="kpi"><div class="kpi-icon" style="background:${enCar>0?'#fdecea':'#e8f5ef'}"><span style="font-size:22px">🚫</span></div><div><div class="kpi-num" style="color:${enCar>0?'var(--rojo)':'var(--verde)'}">${enCar}</div><div class="kpi-label">En carencia</div></div></div>
+  </div>
+  <div class="card mb-14">
+    <div class="card-header"><span class="card-title">🐄 Rodeos y categorías</span></div>
+    <div class="card-body">${chartRodeosHTML()}</div>
   </div>
   <div class="grid-2">
     <div>
@@ -867,7 +884,7 @@ function guardarAnimalPage(){
     preg:document.getElementById('f-preg').value,obs:document.getElementById('f-obs').value.trim(),pesajes,
   };
   
-  if(editId){ const i=animales.findIndex(a=>a.id===editId); Object.assign(animales[i],datos); }
+  if(editId){ const i=animales.findIndex(a=>a.id===editId); if(animales[i].cat!==datos.cat){ (animales[i].eventos=animales[i].eventos||[]).push({id:uid(),tipo:'categoría',desc:animales[i].cat+' → '+datos.cat,fecha:hoy()}); } Object.assign(animales[i],datos); }
   else{ animales.push({id:uid(),sanidad:[],eventos:[],foto:null,reg:hoy(),ts:Date.now(),...datos}); }
   saveAll();
   addActividad('🐄',car,`${datos.cat} - ${datos.raza||''} ${kg?'· '+kg+'kg':''}`);
@@ -905,10 +922,12 @@ function verAnimal(id){
     </div>`}
   </div>
   <div class="grid-2" style="gap:10px;margin-bottom:14px">
-    ${[['Categoría',a.cat],['Raza',a.raza||'—'],['Establecimiento',a.estab||'—'],['Color',a.color||'—'],['Edad',a.edad?a.edad+' meses':'—'],['Dientes',a.dientes||'—'],['Estado repr.',a.preg&&a.preg!=='-'?a.preg:'—']].map(([k,v])=>`<div><div class="text-xs text-muted fw-600">${k}</div><div style="font-size:13px;margin-top:2px">${v}</div></div>`).join('')}
+    ${[['Categoría',a.cat],['Rodeo',rodeoDe(a)?rodeoDe(a).nombre:'—'],['Madre',a.madre&&animales.find(x=>x.id===a.madre)?`<a href="#" onclick="verAnimal('${a.madre}');return false" style="color:var(--azul);font-weight:700">${animales.find(x=>x.id===a.madre).car}</a>`:'—'],['Raza',a.raza||'—'],['Establecimiento',a.estab||'—'],['Color',a.color||'—'],['Edad',a.edad?a.edad+' meses':'—'],['Dientes',a.dientes||'—'],['Estado repr.',a.preg&&a.preg!=='-'?a.preg:'—']].map(([k,v])=>`<div><div class="text-xs text-muted fw-600">${k}</div><div style="font-size:13px;margin-top:2px">${v}</div></div>`).join('')}
   </div>
   ${enCar?`<div class="alerta-item alerta-rojo"><span class="alerta-icon">🚫</span><div><div class="alerta-titulo">Animal en período de carencia</div>${cars.map(s=>`<div class="alerta-det">${s.producto||'Trat.'} → apto carne: ${fmtFecha(s.carenciaFinCarne)}${s.carenciaFinLeche?' · leche: '+fmtFecha(s.carenciaFinLeche):''}</div>`).join('')}</div></div>`:''}
-  ${a.obs?`<div style="font-size:12px;color:var(--gris4);border-top:1px solid var(--gris7);padding-top:10px;margin-top:6px">${a.obs}</div>`:''}`;
+  ${a.obs?`<div style="font-size:12px;color:var(--gris4);border-top:1px solid var(--gris7);padding-top:10px;margin-top:6px">${a.obs}</div>`:''}
+  ${origenHTML(a)}
+  ${bloqueCambiosHTML(a)}`;
   
   // Tab Peso
   const pesoRows=a.pesajes&&a.pesajes.length>0
@@ -941,11 +960,13 @@ function verAnimal(id){
     <button class="tab-btn active" onclick="swTab(this,'tab-info')">Info</button>
     <button class="tab-btn" onclick="swTab(this,'tab-peso')">⚖️ Peso</button>
     <button class="tab-btn" onclick="swTab(this,'tab-san')">💉 Sanidad</button>
-    <button class="tab-btn" onclick="swTab(this,'tab-ev')">📋 Eventos</button>
+    <button class="tab-btn" onclick="swTab(this,'tab-crias')">🐮 Crías</button>
+    <button class="tab-btn" onclick="swTab(this,'tab-ev')">📋 Historial</button>
   </div>
   <div id="tab-info" class="tab-panel active">${infoHTML}</div>
   <div id="tab-peso" class="tab-panel">${pesoHTML}</div>
   <div id="tab-san" class="tab-panel">${sanHTML}</div>
+  <div id="tab-crias" class="tab-panel">${tabCriasHTML(a)}</div>
   <div id="tab-ev" class="tab-panel">${evHTML}</div>`;
   
   abrirModal('modal-animal');
@@ -1053,6 +1074,275 @@ function eliminarAnimal(id){
   animales=animales.filter(a=>a.id!==id);
   rodeos.forEach(r=>{if(r.animales) r.animales=r.animales.filter(x=>x!==id)});
   saveAll(); toast('Animal eliminado'); navTo('animales');
+}
+
+
+// ════════════════════════════════════════════════
+// DASHBOARD: rodeos por categoría
+// ════════════════════════════════════════════════
+function chartRodeosHTML(){
+  const grupos=rodeos.map(r=>({n:r.nombre,an:(r.animales||[]).map(id=>animales.find(a=>a.id===id)).filter(Boolean)}));
+  const asig=new Set(rodeos.flatMap(r=>r.animales||[]));
+  const sin=animales.filter(a=>!asig.has(a.id));
+  if(sin.length) grupos.push({n:'Sin rodeo',an:sin});
+  if(!grupos.length||!animales.length) return '<p style="color:var(--gris4);font-size:13px;text-align:center;padding:16px">Todavía no hay animales ni rodeos</p>';
+  const cats=[...CATS]; animales.forEach(a=>{ if(a.cat&&!cats.includes(a.cat)) cats.push(a.cat); });
+  const usadas=cats.filter(c=>grupos.some(g=>g.an.some(a=>a.cat===c)));
+  const max=Math.max(...grupos.map(g=>g.an.length),1);
+  const filas=grupos.map(g=>{
+    const cnt={}; g.an.forEach(a=>{cnt[a.cat]=(cnt[a.cat]||0)+1;});
+    const w=Math.max(g.an.length/max*100,g.an.length?8:0);
+    const segs=usadas.filter(c=>cnt[c]).map(c=>`<div title="${c}: ${cnt[c]}" style="flex:${cnt[c]};background:${catColor(c)};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden">${cnt[c]/g.an.length>=0.1?cnt[c]:''}</div>`).join('');
+    const detalle=usadas.filter(c=>cnt[c]).map(c=>`${cnt[c]} ${c}`).join(' · ');
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-weight:700;font-size:14px">${g.n}</span><span style="font-weight:700;font-size:18px">${g.an.length}</span></div>
+      <div style="width:${w}%;min-width:${g.an.length?40:0}px;height:26px;border-radius:6px;overflow:hidden;display:flex">${segs}</div>
+      <div style="font-size:11px;color:var(--gris5);margin-top:3px">${detalle||'Sin animales'}</div>
+    </div>`;
+  }).join('');
+  const leyenda=usadas.map(c=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-right:10px"><span style="width:12px;height:12px;border-radius:3px;background:${catColor(c)}"></span>${c}</span>`).join('');
+  return filas+`<div style="border-top:1px solid var(--gris7);padding-top:8px">${leyenda}</div>`;
+}
+
+// ════════════════════════════════════════════════
+// FICHA: categoría, rodeo, crías y partos
+// ════════════════════════════════════════════════
+function rodeoDe(a){ return rodeos.find(r=>r.animales&&r.animales.includes(a.id))||null; }
+function reabrirAnimal(id){ verAnimal(id); try{ if(paginaActual&&render[paginaActual]&&paginaActual!=='manga') render[paginaActual](); }catch(e){} }
+
+function cambiarCategoria(id){
+  const a=animales.find(x=>x.id===id); if(!a) return;
+  const nueva=document.getElementById('cc-cat-'+id).value;
+  if(nueva===a.cat){ toast('Ya tiene esa categoría','err'); return; }
+  if(!a.eventos) a.eventos=[];
+  a.eventos.push({id:uid(),tipo:'categoría',desc:a.cat+' → '+nueva,fecha:hoy()});
+  addActividad('🏷',a.car,'categoría: '+a.cat+' → '+nueva);
+  a.cat=nueva; saveAll(); toast('Categoría actualizada'); reabrirAnimal(id);
+}
+function cambiarRodeoAnimal(id){
+  const a=animales.find(x=>x.id===id); if(!a) return;
+  const destId=document.getElementById('cr-rod-'+id).value;
+  const prev=rodeoDe(a), dest=rodeos.find(r=>r.id===destId)||null;
+  if((prev&&prev.id)===(dest&&dest.id)){ toast('Ya está en ese rodeo','err'); return; }
+  if(prev) prev.animales=prev.animales.filter(z=>z!==id);
+  if(dest){ if(!dest.animales) dest.animales=[]; dest.animales.push(id); }
+  if(!a.eventos) a.eventos=[];
+  a.eventos.push({id:uid(),tipo:'movimiento',desc:(prev?prev.nombre:'Sin rodeo')+' → '+(dest?dest.nombre:'Sin rodeo'),fecha:hoy()});
+  addActividad('🔀',a.car,(prev?prev.nombre:'Sin rodeo')+' → '+(dest?dest.nombre:'Sin rodeo'));
+  saveAll(); toast('Rodeo actualizado'); reabrirAnimal(id);
+}
+function bloqueCambiosHTML(a){
+  const rod=rodeoDe(a);
+  const cats=[...CATS]; if(a.cat&&!cats.includes(a.cat)) cats.push(a.cat);
+  return `<div style="border-top:1px solid var(--gris7);margin-top:14px;padding-top:12px">
+    <div class="fw-600 text-sm mb-8">Cambiar categoría <span class="text-muted" style="font-weight:400">(ahora: ${a.cat})</span></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><select id="cc-cat-${a.id}" class="form-select">${cats.map(c=>`<option ${c===a.cat?'selected':''}>${c}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="cambiarCategoria('${a.id}')">Guardar</button></div>
+    <div class="fw-600 text-sm mb-8">Cambiar de rodeo <span class="text-muted" style="font-weight:400">(ahora: ${rod?rod.nombre:'sin rodeo'})</span></div>
+    <div style="display:flex;gap:8px"><select id="cr-rod-${a.id}" class="form-select"><option value="">— Sin rodeo —</option>${rodeos.map(r=>`<option value="${r.id}" ${rod&&rod.id===r.id?'selected':''}>${r.nombre}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="cambiarRodeoAnimal('${a.id}')">Mover</button></div>
+  </div>`;
+}
+function origenHTML(a){
+  const o=a.origen; if(!o) return '';
+  const tipo={compra:'Compra',propio:'Traslado de otro campo propio',nacimiento:'Nacimiento en el campo'}[o.tipo]||o.tipo;
+  const filas=[['Ingreso',tipo+(o.fecha?' · '+fmtFecha(o.fecha):'')],['Procedencia',o.procedencia||o.campo||''],['Proveedor',o.proveedor||''],['DTE',o.dte||'']].filter(x=>x[1]);
+  return `<div style="margin-top:12px;background:var(--gris7);border-radius:8px;padding:10px 14px"><div class="text-xs text-muted fw-600" style="margin-bottom:4px">ORIGEN</div>${filas.map(([k,v])=>`<div style="font-size:13px"><span class="text-muted">${k}:</span> ${v}</div>`).join('')}</div>`;
+}
+function tabCriasHTML(a){
+  const crias=animales.filter(x=>x.madre===a.id);
+  const partos=(a.eventos||[]).filter(e=>e.tipo==='parto').sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||''));
+  const sueltas=crias.filter(c=>!partos.some(p=>p.criaId===c.id));
+  const edadTxt=c=>{ const d=diasDesde(c.nac||c.reg); return d==null?'':(d<60?d+' días':Math.round(d/30)+' meses'); };
+  const liPartos=partos.length===0?'<p style="color:var(--gris4);font-size:13px;padding:6px 0">Sin partos registrados</p>':partos.map(p=>{
+    const c=p.criaId?animales.find(x=>x.id===p.criaId):null;
+    return `<div class="evento-item"><div class="evento-dot"></div><div class="evento-body"><div class="evento-titulo">Parto · ${fmtFecha(p.fecha)}${p.sexo?' · '+p.sexo:''}</div><div class="evento-det">${c?`Cría: <a href="#" onclick="verAnimal('${c.id}');return false" style="font-weight:700;color:var(--azul)">${c.car}</a> (${c.cat})`:'Cría sin caravana registrada'}${p.desc?' — '+p.desc:''}</div></div></div>`;
+  }).join('');
+  const liSueltas=sueltas.length?`<div class="fw-600 text-sm" style="margin-top:10px">Otras crías vinculadas</div>`+sueltas.map(c=>`<div class="evento-item"><div class="evento-dot"></div><div class="evento-body"><div class="evento-titulo"><a href="#" onclick="verAnimal('${c.id}');return false" style="color:var(--azul)">${c.car}</a> <span class="badge badge-gris">${c.cat}</span></div><div class="evento-det">${edadTxt(c)}</div></div></div>`).join(''):'';
+  return `<div class="kpi" style="margin-bottom:10px;padding:10px 14px"><div class="kpi-icon" style="background:#e8f5ef"><span style="font-size:20px">🐮</span></div><div><div class="kpi-num" style="font-size:20px">${crias.length}</div><div class="kpi-label">Crías asociadas · ${partos.length} partos</div></div></div>
+  <div class="fw-600 text-sm">Historial de partos</div>${liPartos}${liSueltas}
+  <div style="border-top:1px solid var(--gris7);margin-top:14px;padding-top:12px">
+    <div class="fw-600 text-sm mb-8">Registrar parto</div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Fecha</label><input id="pt-fecha-${a.id}" type="date" class="form-input" value="${hoy()}"></div>
+      <div class="form-group"><label class="form-label">Sexo de la cría</label><select id="pt-sexo-${a.id}" class="form-select"><option value="macho">macho</option><option value="hembra">hembra</option></select></div>
+      <div class="form-group form-full"><label class="form-label">Caravana de la cría (opcional, escanear o escribir)</label><input id="pt-car-${a.id}" class="form-input" placeholder="AR-000000" autocomplete="off"></div>
+      <div class="form-group form-full"><label class="form-label">Observaciones</label><input id="pt-desc-${a.id}" class="form-input" placeholder="Ej: parto normal"></div>
+      <div class="form-group form-full"><button class="btn btn-primary btn-sm" onclick="guardarParto('${a.id}')">+ Registrar parto</button></div>
+    </div>
+    <div class="fw-600 text-sm" style="margin:10px 0 6px">Vincular una cría que ya está cargada</div>
+    <div style="display:flex;gap:8px"><input id="vc-car-${a.id}" class="form-input" placeholder="Caravana de la cría" autocomplete="off"><button class="btn btn-secondary btn-sm" onclick="vincularCria('${a.id}')">Vincular</button></div>
+  </div>`;
+}
+function buscarAnimalPorCar(v){
+  const up=String(v).trim().toUpperCase(); if(!up) return null;
+  return animales.find(x=>x.car===up||x.ide===String(v).trim())||null;
+}
+function guardarParto(id){
+  const a=animales.find(x=>x.id===id); if(!a) return;
+  const fecha=document.getElementById('pt-fecha-'+id).value||hoy();
+  const sexo=document.getElementById('pt-sexo-'+id).value;
+  const v=esc(document.getElementById('pt-car-'+id).value.trim());
+  const desc=document.getElementById('pt-desc-'+id).value.trim();
+  let cria=null;
+  if(v){
+    cria=buscarAnimalPorCar(v);
+    if(cria&&cria.id===a.id){ toast('La cría no puede ser la misma vaca','err'); return; }
+    if(!cria){
+      const esEID=/^\d{10,15}$/.test(v);
+      cria={id:uid(),car:esEID?v:v.toUpperCase(),ide:esEID?v:null,cat:sexo==='macho'?'ternero':'ternera',raza:a.raza||'',estab:a.estab||'',fecha:fecha,nac:fecha,sanidad:[],eventos:[],pesajes:[],reg:hoy(),ts:Date.now(),origen:{tipo:'nacimiento',fecha}};
+      animales.push(cria);
+      const r=rodeoDe(a); if(r){ r.animales.push(cria.id); }
+    }
+    cria.madre=a.id; if(!cria.nac) cria.nac=fecha;
+  }
+  if(!a.eventos) a.eventos=[];
+  a.eventos.push({id:uid(),tipo:'parto',fecha,sexo,desc,criaId:cria?cria.id:null});
+  a.preg='vacía';
+  saveAll(); addActividad('🐮',a.car,'parto'+(cria?' · cría '+cria.car:'')); toast('Parto registrado'); reabrirAnimal(id);
+}
+function vincularCria(id){
+  const a=animales.find(x=>x.id===id); if(!a) return;
+  const c=buscarAnimalPorCar(document.getElementById('vc-car-'+id).value);
+  if(!c){ toast('No encontré esa caravana','err'); return; }
+  if(c.id===a.id){ toast('No puede ser su propia cría','err'); return; }
+  c.madre=a.id; saveAll(); toast('Cría vinculada'); reabrirAnimal(id);
+}
+
+// ════════════════════════════════════════════════
+// INGRESO DE ANIMALES (compra / otro campo propio)
+// ════════════════════════════════════════════════
+let ingLista=[]; let ingFilas=[]; let ingTimer=null; let ingTecl=false;
+
+render.ingreso = function(){
+  document.getElementById('topbar-actions').innerHTML='';
+  const cats=CATS.map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('content').innerHTML=`
+  <div class="card" style="max-width:700px;margin:0 auto 14px">
+    <div class="card-header"><span class="card-title">1 · Datos del ingreso</span></div>
+    <div class="card-body"><div class="form-grid">
+      <div class="form-group"><label class="form-label">Tipo de ingreso</label><select id="ing-tipo" class="form-select" onchange="ingTipoCambio()"><option value="compra">Compra</option><option value="propio">De otro campo propio</option></select></div>
+      <div class="form-group"><label class="form-label">Fecha de ingreso</label><input id="ing-fecha" type="date" class="form-input" value="${hoy()}"></div>
+      <div id="ing-compra" class="form-full" style="display:contents">
+        <div class="form-group"><label class="form-label">Procedencia</label><input id="ing-proc" class="form-input" placeholder="Establecimiento / localidad de origen"></div>
+        <div class="form-group"><label class="form-label">Proveedor</label><input id="ing-prov" class="form-input" placeholder="Vendedor / consignatario"></div>
+        <div class="form-group"><label class="form-label">DTE</label><input id="ing-dte" class="form-input" placeholder="Nº de DT-e"></div>
+      </div>
+      <div id="ing-propio" class="form-full" style="display:none"><div class="form-group"><label class="form-label">Campo de origen</label><input id="ing-campo" class="form-input" placeholder="Nombre del campo propio"></div></div>
+      <div class="form-group"><label class="form-label">Categoría (por defecto)</label><select id="ing-cat" class="form-select">${cats}</select></div>
+      <div class="form-group"><label class="form-label">Rodeo de destino</label><select id="ing-rod" class="form-select"><option value="">— Sin rodeo —</option>${rodeos.map(r=>`<option value="${r.id}">${r.nombre}</option>`).join('')}</select></div>
+    </div></div>
+  </div>
+  <div class="card" style="max-width:700px;margin:0 auto 14px">
+    <div class="card-header"><span class="card-title">2a · Por caravana (bastón o a mano)</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:8px"><input id="ing-scan" class="form-input" style="font-size:18px;font-family:monospace;padding:12px;text-align:center" placeholder="Escaneá acá..." autocomplete="off" inputmode="none" oninput="ingInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();ingAgregar();}"><button class="btn btn-secondary" onclick="ingTeclado()">⌨️</button></div>
+      <div id="ing-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0"></div>
+      <details style="margin-bottom:10px"><summary class="text-sm text-muted" style="cursor:pointer">Pegar una lista de caravanas</summary><textarea id="ing-pegar" class="form-input form-textarea" rows="4" placeholder="Una caravana por línea" style="margin-top:6px"></textarea><button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="ingPegar()">Agregar a la lista</button></details>
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:16px" onclick="ingIngresarLista()">Ingresar <span id="ing-n">0</span> animales</button>
+    </div>
+  </div>
+  <div class="card" style="max-width:700px;margin:0 auto 14px">
+    <div class="card-header"><span class="card-title">2b · Carga masiva por archivo</span></div>
+    <div class="card-body">
+      <p class="text-sm text-muted" style="margin-bottom:10px">Excel o CSV con columnas: <b>Caravana</b> (IDV), IDE, Categoría, Raza, Peso, Procedencia, DTE, Proveedor. Solo "Caravana" es obligatoria; lo que falte se completa con los datos de arriba.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="ingPlantilla()">⬇ Descargar plantilla</button><button class="btn btn-secondary btn-sm" onclick="document.getElementById('ing-file').click()">📂 Elegir archivo</button></div>
+      <input type="file" id="ing-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="ingArchivo(this)">
+      <div id="ing-prev" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div id="ing-res" style="max-width:700px;margin:0 auto"></div>`;
+  ingRefrescar(); setTimeout(()=>{const i=document.getElementById('ing-scan'); if(i) i.focus();},80);
+};
+function ingTipoCambio(){
+  const t=document.getElementById('ing-tipo').value;
+  document.getElementById('ing-compra').style.display=t==='compra'?'contents':'none';
+  document.getElementById('ing-propio').style.display=t==='propio'?'block':'none';
+}
+function ingTeclado(){ const i=document.getElementById('ing-scan'); ingTecl=!ingTecl; i.setAttribute('inputmode',ingTecl?'text':'none'); i.blur(); i.focus(); toast(ingTecl?'Teclado activado: escribí y Enter':'Modo bastón'); }
+function ingInput(){ clearTimeout(ingTimer); const i=document.getElementById('ing-scan'); if(!ingTecl&&i.value.trim().length>=4) ingTimer=setTimeout(ingAgregar,400); }
+function ingAgregar(){
+  clearTimeout(ingTimer);
+  const i=document.getElementById('ing-scan'); const v=esc(i.value.trim()); i.value=''; i.focus();
+  if(!v) return;
+  if(ingLista.some(x=>x.toUpperCase()===v.toUpperCase())){ toast('Ya está en la lista','err'); return; }
+  ingLista.push(v); clasifBeep(true); ingRefrescar();
+}
+function ingPegar(){
+  const t=document.getElementById('ing-pegar'); let n=0;
+  t.value.split(/[\n,;]+/).map(x=>esc(x.trim())).filter(Boolean).forEach(v=>{ if(!ingLista.some(x=>x.toUpperCase()===v.toUpperCase())){ ingLista.push(v); n++; } });
+  t.value=''; ingRefrescar(); toast(n+' caravanas agregadas');
+}
+function ingQuitar(i){ ingLista.splice(i,1); ingRefrescar(); }
+function ingRefrescar(){
+  const ch=document.getElementById('ing-chips');
+  if(ch) ch.innerHTML=ingLista.length?ingLista.map((v,i)=>`<span style="background:var(--gris7);padding:5px 10px;border-radius:14px;font-family:monospace;font-size:13px">${v} <a href="#" onclick="ingQuitar(${i});return false" style="color:var(--rojo);text-decoration:none;margin-left:4px">✕</a></span>`).join(''):'<span style="color:var(--gris4);font-size:13px">Todavía no escaneaste ninguna</span>';
+  const n=document.getElementById('ing-n'); if(n) n.textContent=ingLista.length;
+}
+function ingDatos(){
+  const g=id=>document.getElementById(id);
+  return {tipo:g('ing-tipo').value,fecha:g('ing-fecha').value||hoy(),procedencia:g('ing-proc').value.trim(),proveedor:g('ing-prov').value.trim(),dte:g('ing-dte').value.trim(),campo:g('ing-campo').value.trim(),cat:g('ing-cat').value,rodId:g('ing-rod').value};
+}
+function ingCrear(items,d){
+  const rod=rodeos.find(r=>r.id===d.rodId)||null; let nuevos=0; const rep=[];
+  items.forEach(it=>{
+    const v=String(it.car||it.ide||'').trim(); if(!v) return;
+    const ide=String(it.ide||'').replace(/\D/g,''); const esEID=/^\d{10,15}$/.test(v);
+    const car=esEID&&!it.car?v:v.toUpperCase();
+    if(animales.find(x=>x.car===car||(ide&&x.ide===ide)||(esEID&&x.ide===v))){ rep.push(car); return; }
+    const catIt=String(it.cat||'').toLowerCase().trim();
+    const cat=CATS.includes(catIt)?catIt:d.cat;
+    const proc=it.procedencia||d.procedencia, prov=it.proveedor||d.proveedor, dte=it.dte||d.dte;
+    const a={id:uid(),car,ide:esEID?v:(ide||null),cat,raza:it.raza||'',estab:'',fecha:d.fecha,sanidad:[],eventos:[],pesajes:[],reg:hoy(),ts:Date.now(),
+      origen:{tipo:d.tipo,fecha:d.fecha,procedencia:d.tipo==='compra'?proc:'',proveedor:d.tipo==='compra'?prov:'',dte:d.tipo==='compra'?dte:'',campo:d.tipo==='propio'?(it.campo||d.campo):''}};
+    const kg=parseFloat(it.peso); if(kg) a.pesajes.push({kg,fecha:d.fecha,ts:Date.now()});
+    const desc=d.tipo==='compra'?('Compra'+(prov?' · '+prov:'')+(dte?' · DTE '+dte:'')+(proc?' · desde '+proc:'')):('Ingreso desde campo propio'+(a.origen.campo?': '+a.origen.campo:''));
+    a.eventos.push({id:uid(),tipo:'ingreso',desc,fecha:d.fecha});
+    animales.push(a);
+    if(rod){ if(!rod.animales) rod.animales=[]; rod.animales.push(a.id); a.eventos.push({id:uid(),tipo:'movimiento',desc:'→ '+rod.nombre,fecha:d.fecha}); }
+    nuevos++;
+  });
+  saveAll();
+  addActividad('📥',d.tipo==='compra'?'Ingreso por compra':'Ingreso de campo propio',nuevos+' animales'+(d.proveedor?' · '+d.proveedor:''));
+  return {nuevos,rep};
+}
+function ingMostrarRes(r){
+  const el=document.getElementById('ing-res'); if(!el) return;
+  el.innerHTML=`<div class="card"><div class="card-body" style="background:#e8f5ef;color:#1a6649;font-weight:600">✓ Ingresaron ${r.nuevos} animales${r.rep.length?`<div style="font-weight:400;color:#e67e22;margin-top:6px">${r.rep.length} ya existían y se omitieron: ${r.rep.slice(0,15).join(', ')}${r.rep.length>15?'…':''}</div>`:''}</div></div>`;
+}
+function ingIngresarLista(){
+  if(!ingLista.length){ toast('No hay caravanas en la lista','err'); return; }
+  const d=ingDatos();
+  if(d.tipo==='compra'&&!d.proveedor&&!d.procedencia&&!d.dte&&!confirm('No completaste procedencia, proveedor ni DTE. ¿Ingresar igual?')) return;
+  const r=ingCrear(ingLista.map(v=>({car:/^\d{10,15}$/.test(v)?'':v,ide:/^\d{10,15}$/.test(v)?v:''})),d);
+  ingLista=[]; ingRefrescar(); ingMostrarRes(r); toast('Ingreso registrado');
+}
+function ingNorm(k){ return String(k).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+const ING_MAP={car:['caravana','idv','caravanavisual','nrocaravana','car','nrodecaravana'],ide:['ide','chip','electronica','caravanaelectronica','rfid','eid'],cat:['categoria','cat'],raza:['raza'],peso:['peso','kg','pesokg'],procedencia:['procedencia','origen'],dte:['dte','nrodte'],proveedor:['proveedor','vendedor'],campo:['campoorigen','campo']};
+function ingArchivo(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(typeof XLSX==='undefined'){ toast('Falta la librería de Excel: abrí la app con internet una vez','err'); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(rd.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+      ingFilas=rows.map(r=>{ const o={}; Object.keys(r).forEach(k=>{ const nk=ingNorm(k); for(const f2 in ING_MAP) if(ING_MAP[f2].includes(nk)) o[f2]=String(r[k]).trim(); }); return o; }).filter(o=>o.car||o.ide);
+      const pv=document.getElementById('ing-prev');
+      pv.innerHTML=ingFilas.length?`<div style="padding:10px;background:var(--gris7);border-radius:8px;font-size:14px">Archivo <b>${f.name}</b>: ${ingFilas.length} animales listos.<div style="font-family:monospace;font-size:12px;margin-top:4px;color:var(--gris5)">${ingFilas.slice(0,5).map(o=>o.car||o.ide).join(', ')}${ingFilas.length>5?'…':''}</div></div><button class="btn btn-primary" style="width:100%;margin-top:10px;padding:12px" onclick="ingImportarArchivo()">Importar ${ingFilas.length} animales</button>`:'<div style="color:var(--rojo);font-size:13px">No encontré filas con caravana. Revisá que haya una columna "Caravana".</div>';
+    }catch(e){ toast('No pude leer el archivo','err'); }
+    inp.value='';
+  };
+  rd.readAsArrayBuffer(f);
+}
+function ingImportarArchivo(){
+  if(!ingFilas.length) return;
+  const r=ingCrear(ingFilas,ingDatos()); ingFilas=[];
+  document.getElementById('ing-prev').innerHTML=''; ingMostrarRes(r); toast('Importación lista');
+}
+function ingPlantilla(){
+  if(typeof XLSX==='undefined'){ toast('Abrí la app con internet una vez','err'); return; }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Caravana','IDE','Categoría','Raza','Peso','Procedencia','DTE','Proveedor'],['AR-001234','900000000000001','ternero','Aberdeen Angus',180,'Estancia La Paz','DTE-12345','Consignataria X']]),'Ingreso');
+  XLSX.writeFile(wb,'plantilla_ingreso_GanadoApp.xlsx');
 }
 
 // ─── ARMAR RODEOS: escanear caravana → asignar al rodeo elegido ───
@@ -1890,8 +2180,13 @@ function btnVoz(){ return ''; }
 // ════════════════════════════════════════════════
 function exportarExcel(){
   const wb=XLSX.utils.book_new();
-  
-  const anData=[['ID','IDV (Caravana Visual)','IDE (Electrónico RFID)','Categoría','Raza','Establecimiento','Color','Edad (m)','Dientes','Preñez','Observaciones','Registro'],...animales.map(a=>[a.id,a.car,a.ide||'',a.cat,a.raza||'',a.estab||'',a.color||'',a.edad||'',a.dientes||'',a.preg||'',a.obs||'',a.reg||''])];
+  const rodDe=a=>{const r=rodeos.find(r=>r.animales&&r.animales.includes(a.id));return r?r.nombre:'';};
+  const asigData=[['Rodeo','Caravana (IDV)','Caravana electrónica (IDE)','Categoría','Fecha']];
+  rodeos.forEach(r=>(r.animales||[]).forEach(id=>{const a=animales.find(x=>x.id===id); if(a) asigData.push([r.nombre,a.car,a.ide||'',a.cat||'',(a.eventos||[]).filter(e=>e.tipo==='movimiento').slice(-1)[0]?.fecha||a.reg||'']);}));
+  animales.filter(a=>!rodDe(a)).forEach(a=>asigData.push(['(sin rodeo)',a.car,a.ide||'',a.cat||'',a.reg||'']));
+  const wsA=XLSX.utils.aoa_to_sheet(asigData); wsA['!cols']=[{wch:22},{wch:20},{wch:26},{wch:16},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,wsA,'Rodeos y caravanas');
+  const anData=[['ID','Rodeo','IDV (Caravana Visual)','IDE (Electrónico RFID)','Categoría','Raza','Establecimiento','Color','Edad (m)','Dientes','Preñez','Observaciones','Registro','Madre','Tipo ingreso','Procedencia','DTE','Proveedor'],...animales.map(a=>[a.id,rodDe(a),a.car,a.ide||'',a.cat,a.raza||'',a.estab||'',a.color||'',a.edad||'',a.dientes||'',a.preg||'',a.obs||'',a.reg||'',(animales.find(x=>x.id===a.madre)||{}).car||'',a.origen?a.origen.tipo:'',a.origen?(a.origen.procedencia||a.origen.campo||''):'',a.origen?a.origen.dte||'':'',a.origen?a.origen.proveedor||'':''])];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(anData),'Animales');
   
   const peData=[['IDV','IDE','Peso (kg)','Fecha','GDP']];
@@ -1928,6 +2223,38 @@ function guardarAnimal(){ guardarAnimalPage() }
 // ════════════════════════════════════════════════
 // DATOS DEMO (solo si no hay datos)
 // ════════════════════════════════════════════════
+function exportarRespaldo(){
+  const d={app:'ganadoapp',v:1,fecha:new Date().toISOString(),animales,rodeos,actividad,meds};
+  const b=new Blob([JSON.stringify(d)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='GanadoApp_respaldo_'+hoy()+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); toast('Respaldo exportado');
+}
+function importarRespaldo(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result); if(d.app!=='ganadoapp') throw 0;
+      let nA=0,nR=0;
+      (d.animales||[]).forEach(x=>{ if(!animales.some(y=>y.id===x.id||y.car===x.car)){animales.push(x);nA++;} });
+      (d.rodeos||[]).forEach(r=>{
+        let l=rodeos.find(y=>y.id===r.id||y.nombre.toLowerCase()===r.nombre.toLowerCase());
+        if(!l){ l=Object.assign({},r,{animales:[]}); rodeos.push(l); nR++; }
+        // reasignar ids si el animal local tiene otro id (mismo caravana)
+        (r.animales||[]).forEach(id=>{
+          const src=(d.animales||[]).find(x=>x.id===id); if(!src) return;
+          const loc=animales.find(y=>y.id===id||y.car===src.car); if(!loc) return;
+          rodeos.forEach(o=>{ if(o!==l&&o.animales) o.animales=o.animales.filter(z=>z!==loc.id); });
+          if(!l.animales) l.animales=[];
+          if(!l.animales.includes(loc.id)) l.animales.push(loc.id);
+        });
+      });
+      saveAll(); toast('Importado: '+nA+' animales nuevos, '+nR+' rodeos nuevos'); navTo('rodeos');
+    }catch(e){ toast('Archivo no válido','err'); }
+    inp.value='';
+  };
+  rd.readAsText(f);
+}
 function borrarTodo(){
   if(!confirm('¿Borrar TODOS los animales, rodeos, medicamentos y actividad? No se puede deshacer.')) return;
   if(!confirm('Última confirmación: se borra todo. ¿Seguro?')) return;
