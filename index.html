@@ -557,6 +557,7 @@ tr:hover td{background:#fbfbfb}
     <div class="modal-body" id="modal-animal-body"></div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="modal-animal-del">🗑 Eliminar</button>
+      <button class="btn btn-primary btn-sm" id="modal-animal-edit">✏️ Editar datos</button>
       <button class="btn btn-secondary" onclick="cerrarModal('modal-animal')">Cerrar</button>
     </div>
   </div>
@@ -715,7 +716,7 @@ function cerrarSidebar(){
 // ════════════════════════════════════════════════
 let paginaActual='';
 function navTo(p){
-  paginaActual=p;
+  paginaActual=p; editId=null;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const btn = [...document.querySelectorAll('.nav-item')].find(b=>b.getAttribute('onclick')?.includes("'"+p+"'"));
   if(btn) btn.classList.add('active');
@@ -848,6 +849,11 @@ render.registrar = function(){
     <button class="btn btn-primary" onclick="guardarAnimalPage()">Guardar animal</button>
   </div></div>`;
 };
+function editarAnimal(id){
+  cerrarModal('modal-animal'); navTo('registrar'); editId=id; render.registrar();
+  document.getElementById('page-title').textContent='Editar animal';
+  window.scrollTo&&window.scrollTo(0,0);
+}
 function formAnimalHTML(a){
   const cats=CATS.map(c=>`<option value="${c}" ${a?.cat===c?'selected':''}>${c}</option>`).join('');
   const razas=RAZAS.map(r=>`<option value="${r}" ${a?.raza===r?'selected':''}>${r}</option>`).join('');
@@ -910,6 +916,7 @@ function verAnimal(id){
   if(!a) return;
   const modal=document.getElementById('modal-animal');
   document.getElementById('modal-animal-titulo').textContent=`${a.car} — ${a.cat}`;
+  document.getElementById('modal-animal-edit').onclick=()=>editarAnimal(id);
   document.getElementById('modal-animal-del').onclick=()=>{ if(confirm('¿Eliminar este animal?')){ eliminarAnimal(id); cerrarModal('modal-animal'); } };
   
   // Tab Info
@@ -1148,9 +1155,9 @@ function cambiarCategoria(id){
   addActividad('🏷',a.car,'categoría: '+a.cat+' → '+nueva);
   a.cat=nueva; saveAll(); toast('Categoría actualizada'); reabrirAnimal(id);
 }
-function cambiarRodeoAnimal(id){
+function cambiarRodeoAnimal(id,destId){
   const a=animales.find(x=>x.id===id); if(!a) return;
-  const destId=document.getElementById('cr-rod-'+id).value;
+  destId=destId||'';
   const prev=rodeoDe(a), dest=rodeos.find(r=>r.id===destId)||null;
   if((prev&&prev.id)===(dest&&dest.id)){ toast('Ya está en ese rodeo','err'); return; }
   if(prev) prev.animales=prev.animales.filter(z=>z!==id);
@@ -1179,8 +1186,8 @@ function bloqueCambiosHTML(a){
     <div style="display:flex;gap:8px;margin-bottom:12px"><input id="idv-${a.id}" class="form-input" value="${sinIDV?'':a.car}" placeholder="AR-000000" autocomplete="off"><button class="btn btn-primary btn-sm" onclick="cambiarIDV('${a.id}')">Guardar</button></div>
     <div class="fw-600 text-sm mb-8">Cambiar categoría <span class="text-muted" style="font-weight:400">(ahora: ${a.cat})</span></div>
     <div style="display:flex;gap:8px;margin-bottom:12px"><select id="cc-cat-${a.id}" class="form-select">${cats.map(c=>`<option ${c===a.cat?'selected':''}>${c}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="cambiarCategoria('${a.id}')">Guardar</button></div>
-    <div class="fw-600 text-sm mb-8">Cambiar de rodeo <span class="text-muted" style="font-weight:400">(ahora: ${rod?rod.nombre:'sin rodeo'})</span></div>
-    <div style="display:flex;gap:8px"><select id="cr-rod-${a.id}" class="form-select"><option value="">— Sin rodeo —</option>${rodeos.map(r=>`<option value="${r.id}" ${rod&&rod.id===r.id?'selected':''}>${r.nombre}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="cambiarRodeoAnimal('${a.id}')">Mover</button></div>
+    <div class="fw-600 text-sm mb-8">Mover a otro rodeo <span class="text-muted" style="font-weight:400">(ahora: ${rod?rod.nombre:'sin rodeo'})</span></div>
+    <div style="display:grid;gap:8px">${rodeos.map(r=>{const es=rod&&rod.id===r.id,c=r.color||'#1a6649';return `<button ${es?'disabled':''} onclick="cambiarRodeoAnimal('${a.id}','${r.id}')" style="padding:12px;font-size:15px;font-weight:700;border-radius:10px;border:2px solid ${c};background:${es?c:'#fff'};color:${es?'#fff':c};opacity:${es?.85:1}">${r.nombre}${es?' ✓ (está acá)':''}</button>`}).join('')}${rod?`<button onclick="cambiarRodeoAnimal('${a.id}','')" style="padding:10px;font-size:13px;border-radius:10px;border:1px solid var(--gris6);background:#fff;color:var(--gris4)">Sacar de todos los rodeos</button>`:''}</div>
   </div>`;
 }
 function origenHTML(a){
